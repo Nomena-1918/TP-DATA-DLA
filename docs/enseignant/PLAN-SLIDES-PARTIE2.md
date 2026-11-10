@@ -1,12 +1,12 @@
 # Blueprint des slides — Partie 2 : Exploration, Nettoyage & Règles de rapprochement
 
-Ce document définit le plan détaillé de la **Présentation 2** sur les 5 présentations prévues pour le TP Data D.L.A. Conçu pour être accessible, visuel et pédagogique, il guide les étudiants dans l'exploration active des trois sources de données via le notebook Jupyter, la caractérisation des disparités de formats et des anomalies de saisie, l'écriture des fonctions pures de normalisation, et la conception de la matrice hiérarchique de rapprochement d'identités (`UID`) avec son verrou de sécurité anti-conflit.
+Ce document définit le plan détaillé de la **Présentation 2** sur les 5 présentations prévues pour le TP Data D.L.A. Conçu pour être particulièrement aéré, direct et visuel, il évite toute redondance et guide pas à pas les étudiants dans l'exploration des données, le nettoyage par fonctions pures, la découverte du Record Linkage et la formalisation de la matrice de rapprochement d'identités (`UID`).
 
 > **Règles de rédaction & Identité visuelle**
 > - **Anonymisation stricte** : scénario présenté uniquement comme une compagnie d'assurance fictive à Madagascar ; aucune mention d'entreprise réelle ni de cabinet de conseil ; identifiant pivot nommé exclusivement `UID`.
-> - **Dimensionnement local unique** : seuls les chiffres du jeu de travail léger (400 000 fiches au total, 100k Auto, 100k Life, 200k Autre, 70k cohorte commune, 256k population théorique) sont mentionnés.
-> - **Accessibilité pour tous** : formulations naturelles, simples et directes ; chaque concept mathématique ou algorithmique est expliqué par son intuition concrète ; bannissement des répétitions de pourcentages excessifs et de « coquilles » (synonymes variés : fautes de frappe, anomalies de saisie, écarts d'écriture, variations de graphie).
-> - **Visuels & Code snippets** : diapositives allégées en texte, cartes à fort contraste visuel, diagrammes de décision fléchés et boîtes de code style terminal sombre (`#1E293B`) avec texte clair (`#F1F5F9`).
+> - **Dimensionnement local unique** : seuls les chiffres du jeu de travail léger (400 000 fiches au total, 100k Auto, 100k Life, 200k Autre, 70k cohorte commune, 256k population théorique, 331 fiches ponts) sont mentionnés.
+> - **Zéro répétition & Clarté maximale** : chaque diapositive apporte un angle nouveau sans paraphraser les précédentes ; formulations sobres, directes et accessibles à tous ; vocabulaire varié pour les anomalies (fautes de frappe, anomalies de saisie, écarts d'écriture, variations de graphie, bruit).
+> - **Aération & Visuels explicatifs** : diapositives allégées au maximum en texte brut ; priorité aux schémas décisionnels, comparaisons en cartes contrastées et boîtes de code style terminal sombre (`#1E293B`) avec annotations explicatives ligne par ligne.
 > - **Palette & Identité IT University** : Bleu institutionnel (`#283A97`), Vert feuille (`#76B729`), Vert citron (`#B2D235`), Arrière-plan doux (`#F8FAFC`) et boîtes sombres (`#1E293B`).
 > - **Notes orateur** : repères oraux concrets pour l'enseignant sur chaque diapositive.
 
@@ -17,14 +17,14 @@ Ce document définit le plan détaillé de la **Présentation 2** sur les 5 pré
 | Présentation | Titre | Statut | Périmètre principal |
 | :--- | :--- | :--- | :--- |
 | **Partie 1** | **Cadrage, Préparation locale & Connexion aux datasources** | Validé & Déployé (18 slides) | Contexte métier, prérequis machine, feuille de route, règle d'or non destructive, cartographie, génération & colonnes détaillées des 3 sources, setup local (`uv`, `.env`), connexions en lecture seule. |
-| **Partie 2** | **Exploration, Nettoyage & Règles de rapprochement** | **Document courant** (15 slides) | Diagnostic notebook, hétérogénéité des formats, fonctions pures de normalisation, tokenisation des prénoms, matrice hybride `C1`–`C4`, verrou anti-conflit CIN, tolérance floue adaptative, aiguillage tripartite et ponts transitifs. |
+| **Partie 2** | **Exploration, Nettoyage & Règles de rapprochement** | **Document courant** (16 slides) | Diagnostic notebook, hétérogénéité des formats, fonctions pures de normalisation, tokenisation des prénoms, concept de Record Linkage (statistique vs déterministe), matrice `C1`–`C4`, verrou anti-conflit CIN, tolérance floue adaptative, aiguillage tripartite et ponts transitifs. |
 | **Partie 3** | **Modélisation cible & Pipeline ETL en flux** | À rédiger ultérieurement | Schéma cible `tp_assurance_etl` (sans `uid` au départ), conservation du brut + colonnes canoniques + `details_metier` JSONB, extraction streaming + `COPY`, indexation de base. |
 | **Partie 4** | **Ajout DDL `UID` & Moteur Union-Find** | À rédiger ultérieurement | Ajout de la colonne `uid`, structure `CompactUnionFind`, passes exactes `C1`–`C3`, passe floue par blocage `(date_naiss_norm, sexe_norm)`, routage vers la file humaine. |
 | **Partie 5** | **Mini-application Web, Arbitrage humain & Audit** | À rédiger ultérieurement | Interface FastAPI (tableau de bord, recherche, fiche groupe `UID`, file de validation dont `SUSPICION_FAUTE_CIN`), tests `pytest` et métriques de réconciliation. |
 
 ---
 
-## Détail des 15 diapositives — Présentation 2
+## Détail des 16 diapositives — Présentation 2
 
 ---
 
@@ -48,27 +48,27 @@ Ce document définit le plan détaillé de la **Présentation 2** sur les 5 pré
 - **Titre** : `Feuille de route : cap sur l'étape 2` (Bleu nuit `#1E293B`, 19pt gras).
 - **Sous-titre** : `Comprendre les disparités pour bâtir une matrice de décision irréprochable` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Schéma séquentiel du TP (5 blocs horizontaux / verticaux)
+#### Schéma séquentiel épuré (Progression visuelle)
 ```text
-[ Étape 1 : Préparation & Connexions ]  --> TERMINÉ (18 slides · Environnement & Sources prêts)
+[ Étape 1 : Préparation & Connexions ]  ──> TERMINÉ (18 slides · Environnement & Sources prêts)
                     │
-                    v
-[ Étape 2 : Exploration & Règles ]      --> SÉANCE COURANTE
+                    ▼
+[ Étape 2 : Exploration & Règles ]      ──> SÉANCE COURANTE
   ├── 1. Diagnostiquer : profils statistiques, formats, anomalies réelles
   ├── 2. Normaliser   : module de fonctions pures (normalisation.py)
-  └── 3. Décider      : matrice C1 à C4, tolérance floue & verrou CIN
+  └── 3. Décider      : Record Linkage, matrice C1 à C4 & verrou CIN
                     │
-                    v
-[ Étape 3 : Schéma Cible & ETL Flux ]   --> Prochaine étape
-[ Étape 4 : Moteur Union-Find & UID ]   --> À venir
-[ Étape 5 : App Web & Audit Qualité ]   --> À venir
+                    ▼
+[ Étape 3 : Schéma Cible & ETL Flux ]   ──> Prochaine étape
+[ Étape 4 : Moteur Union-Find & UID ]   ──> À venir
+[ Étape 5 : App Web & Audit Qualité ]   ──> À venir
 ```
 
 #### Les 3 livrables concrets de la séance
-1. **Diagnostiquer les hétérogénéités** : types SQL disparates, formats textuels, dates, diacritiques, casse et conventions par système.
-2. **Implémenter les fonctions pures de normalisation** : transformation déterministe vers des colonnes canoniques comparables.
-3. **Formaliser la matrice hiérarchique de rapprochement** : règles `C1` à `C4`, gestion des seuils flous et verrou absolu anti-conflit de CIN.
-- **Notes orateur** : Aujourd'hui, on ne charge pas encore la base cible définitive et on n'assigne pas encore les `UID`. On observe, on nettoie et on formalise les critères de décision.
+1. **Diagnostiquer** : cartographier les écarts de types et formats dans `notebooks/01_exploration.ipynb`.
+2. **Nettoyer** : coder et valider les fonctions pures dans `src/tp_data_dla/normalisation.py`.
+3. **Formaliser** : définir les règles de Record Linkage déterministe avec verrou anti-conflit de CIN.
+- **Notes orateur** : Souligner que l'on n'écrit pas encore de données dans la base cible aujourd'hui : on forge les règles et les outils de transformation.
 
 ---
 
@@ -77,42 +77,42 @@ Ce document définit le plan détaillé de la **Présentation 2** sur les 5 pré
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `DIAGNOSTIC DES SOURCES · DISPARITÉ TECHNIQUE` (Vert `#2EA853`, 10pt gras).
 - **Titre** : `Le choc des formats : un même individu, trois visions` (Bleu nuit `#1E293B`, 19pt gras).
-- **Sous-titre** : `Exemple réel d'une même personne enregistrée dans nos trois bases` (Gris ardoise `#64748B`, 10.5pt).
+- **Sous-titre** : `Cas réel d'une même personne physique présente dans nos trois systèmes` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Tableau comparatif concret (Carte centrale blanche `#FFFFFF` bordée de `#E2E8F0`)
+#### Tableau comparatif central (Carte blanche `#FFFFFF` bordée de `#E2E8F0`)
 
 | Attribut | Auto (PostgreSQL 16) | Life (MySQL 8.4) | Autre (Fichier CSV) | Diagnostic immédiat |
 | :--- | :--- | :--- | :--- | :--- |
-| **Identifiant local** | `id_client_auto` = `1004521` | `ref_adherent` = `3004521` | `ref_fiche` = `'EXT-5004521'` | Espaces de clés totalement disjoints |
-| **Pièce d'identité** | `numero_cin` = `'CIN- 800005316023'` | `cin_numerique` = `800005316023` | `piece_identite` = `'800005316023'` | Préfixe texte vs entier `BIGINT` vs chaîne |
-| **Nom de famille** | `nom_assure` = `' Ramanitra '` | `nom_adherent` = `'RAMANITRA'` | `patronyme` = `'Ramanitra'` | Espaces parasites, casse mixte |
-| **Prénoms** | `prenoms_assure` = `'Faly Tahina'` | `prenoms_adherent` = `'FALY-TAHINA'` | `autres_noms` = `'Tahina Faly'` | Tirets, casse et inversion de l'ordre |
-| **Date naissance** | `ne_le` = `'1970-04-19'` (`DATE`) | `date_naiss` = `19700419` (`INT`) | `date_naissance` = `'19-04-1970'` (`TEXT`) | Date SQL vs Entier compact vs Format français |
+| **Identifiant local** | `id_client_auto` = `1004521` | `ref_adherent` = `3004521` | `ref_fiche` = `'EXT-5004521'` | Espaces de clés disjoints |
+| **Pièce d'identité** | `numero_cin` = `'CIN- 800005316023'` | `cin_numerique` = `800005316023` | `piece_identite` = `'800005316023'` | Texte préfixé vs BIGINT vs chaîne |
+| **Nom de famille** | `nom_assure` = `' Ramanitra '` | `nom_adherent` = `'RAMANITRA'` | `patronyme` = `'Ramanitra'` | Espaces superflus, casse mixte |
+| **Prénoms** | `prenoms_assure` = `'Faly Tahina'` | `prenoms_adherent` = `'FALY-TAHINA'` | `autres_noms` = `'Tahina Faly'` | Tirets, casse et ordre inversé |
+| **Date naissance** | `ne_le` = `'1970-04-19'` (`DATE`) | `date_naiss` = `19700419` (`INT`) | `date_naissance` = `'19-04-1970'` (`TEXT`) | Date SQL vs Entier compact vs Format texte |
 | **Téléphone** | `mobile` = `'00 95 397 11'` | `tel_contact` = `'+000009539711'` | `contact_tel` = `'00-95-397-11'` | Indicatif international, tirets, espaces |
 | **Sexe / Genre** | `sexe` = `'Masculin'` | `genre` = `1` | `code_sexe` = `'M'` | Libellé texte vs code binaire (`0/1`) vs lettre |
 
-- **Notes orateur** : Faire remarquer aux étudiants qu'aucune colonne n'est immédiatement comparable à l'état brut. Même la date de naissance est stockée sous 3 types physiques complètement différents.
+- **Notes orateur** : Montrer que sans traitement préalable, aucun attribut n'est strictement égal entre les bases.
 
 ---
 
-### Slide 4 — Pourquoi la jointure SQL directe échoue lamentablement
+### Slide 4 — Pourquoi un simple JOIN SQL direct est impossible
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `DIAGNOSTIC TECHNIQUE · ÉCHEC DU JOIN CLASSIQUE` (Vert `#2EA853`, 10pt gras).
 - **Titre** : `Pourquoi un simple JOIN SQL direct est impossible` (Bleu nuit `#1E293B`, 19pt gras).
-- **Sous-titre** : `Deux requêtes naïves et leurs conséquences immédiates` (Gris ardoise `#64748B`, 10.5pt).
+- **Sous-titre** : `Démonstration de deux requêtes directes et de leurs blocages` (Gris ardoise `#64748B`, 10.5pt).
 
-#### 2 colonnes comparatives
-- **Colonne gauche : Boîte Terminal sombre `#1E293B` (Code SQL naïf)** :
+#### 2 colonnes aérées
+- **Colonne gauche : Boîte Terminal sombre `#1E293B` (Requêtes SQL réelles commentées)** :
 ```sql
--- Tentative 1 : Jointure directe sur le CIN
+-- Blocage 1 : Incompatibilité physique de types
 SELECT a.nom_assure, l.nom_adherent 
 FROM tp_assurance.clients_auto a
 JOIN tp_assurance_life.clients_life l 
   ON a.numero_cin = l.cin_numerique;
--- ERREUR : Incompatibilité de types (TEXT vs BIGINT) !
+-- ERREUR : operator does not exist: text = bigint
 
--- Tentative 2 : Jointure sur Nom et Date
+-- Blocage 2 : Égalité stricte rendue caduque par la saisie
 SELECT a.id_client_auto, l.ref_adherent
 FROM tp_assurance.clients_auto a
 JOIN tp_assurance_life.clients_life l
@@ -121,12 +121,12 @@ JOIN tp_assurance_life.clients_life l
 -- RÉSULTAT : 0 correspondance trouvée !
 ```
 
-- **Colonne droite : Carte d'analyse des blocages (`#FFFFFF`)** :
-  - **1. Rupture de types physiques** : Un moteur SQL refuse d'office de joindre une chaîne formatée `'CIN- ...'` avec un entier numérique.
-  - **2. Bruit invisible** : Les espaces de début/fin (`' Ramanitra '`) et la sensibilité à la casse font échouer l'égalité stricte `=`.
-  - **3. Formats de date non alignés** : `'1970-04-19'` ne correspondra jamais à `'19700419'`.
-  - **Conclusion** : Un pipeline de transformation canonique en amont est indispensable avant tout rapprochement.
-- **Notes orateur** : Souligner que l'échec de la jointure directe est typique des systèmes d'information d'entreprise historiques bâtis en silos indépendants.
+- **Colonne droite : Carte explicative (`#FFFFFF`)** :
+  - **Types SQL disparates** : Le SGBD bloque la comparaison directe d'une chaîne formatée avec un entier natif.
+  - **Sensibilité à la casse & espaces** : `' Ramanitra ' = 'RAMANITRA'` est évalué à `FALSE`.
+  - **Incohérence temporelle** : `'1970-04-19'` $\ne$ `'19700419'`.
+  - **Conclusion** : Un nettoyage canonique intermédiaire est techniquement obligatoire.
+- **Notes orateur** : Cette diapositive justifie concrètement pourquoi l'on doit passer par Python pour normaliser avant de rapprocher.
 
 ---
 
@@ -135,9 +135,9 @@ JOIN tp_assurance_life.clients_life l
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `QUALITÉ DES DONNÉES · BIAIS DE SAISIE HUMAINE` (Vert `#2EA853`, 10pt gras).
 - **Titre** : `Les 4 familles d'anomalies identifiées dans les sources` (Bleu nuit `#1E293B`, 19pt gras).
-- **Sous-titre** : `Environ 5 % de bruit réaliste simulant les habitudes des agents de saisie` (Gris ardoise `#64748B`, 10.5pt).
+- **Sous-titre** : `Environ 5 % de variations réalistes reproduisant les habitudes des agents de saisie` (Gris ardoise `#64748B`, 10.5pt).
 
-#### 4 cartes visuelles équilibrées (Grille 2x2 avec fonds thématiques clairs)
+#### 4 cartes visuelles équilibrées (Grille 2x2 aérée)
 
 ```text
 ┌────────────────────────────────────────┐   ┌────────────────────────────────────────┐
@@ -157,31 +157,31 @@ JOIN tp_assurance_life.clients_life l
 │   Ex : 'RAKOTOO' ou '800000000083'     │   │   Ex : 'Lieu de naissance : NULL'      │
 └────────────────────────────────────────┘   └────────────────────────────────────────┘
 ```
-- **Notes orateur** : Préciser que ces erreurs ne sont pas des bugs de notre générateur mais une reproduction fidèle des données réelles d'assurance où plusieurs personnes saisissent sur des formulaires différents au fil des décennies.
+- **Notes orateur** : Ces anomalies simulent des dizaines d'années de saisies manuelles en agence sans validation centralisée.
 
 ---
 
-### Slide 6 — Deux pièges relationnels majeurs : Homonymes & Foyers
+### Slide 6 — Deux pièges relationnels : Homonymes & Foyers
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `PIÈGES MÉTIER · ÉVITER LES AMALGAMMES` (Vert `#2EA853`, 10pt gras).
 - **Titre** : `Deux pièges relationnels : Homonymes et Foyers` (Bleu nuit `#1E293B`, 19pt gras).
-- **Sous-titre** : `Pourquoi un algorithme naïf commet des fusions illégitimes catastrophiques` (Gris ardoise `#64748B`, 10.5pt).
+- **Sous-titre** : `Pourquoi un algorithme naïf commet des fusions destructrices` (Gris ardoise `#64748B`, 10.5pt).
 
 #### 2 cartes contrastées (Danger / Avertissement)
 - **Carte 1 : 👥 Le piège des homonymes (Rouge doux `#FEF2F2`, bordure rouge)** :
-  - **Cas concret** : Deux individus distincts s'appellent « Jean RAKOTO », sont nés le même jour dans la même ville, mais ont deux numéros CIN officiels distincts.
-  - **Risque d'un algorithme naïf** : Les regrouper sous un seul UID sur la base de l'état civil.
-  - **Conséquence métier** : Fusion illégitime de contrats d'assurance, violation de la confidentialité des données personnelles.
+  - **Situation** : Deux personnes physiques distinctes ont exactement le même nom, les mêmes prénoms et la même date de naissance, mais ont deux numéros de CIN officiels distincts.
+  - **Erreur naïve** : Les fusionner sur la seule base de l'état civil.
+  - **Conséquence métier** : Violation de la confidentialité et contrats mélangés.
 - **Carte 2 : 🏠 Le piège du foyer familial (Jaune doux `#FEF3C7`, bordure ambre)** :
-  - **Cas concret** : Deux conjoints ou un parent et son enfant partagent la même ligne fixe, le même mobile de contact ou la même boîte courriel.
-  - **Risque d'un algorithme naïf** : Conclure qu'un même numéro de téléphone équivaut à un seul individu.
-  - **Conséquence métier** : Amalgamation de deux personnes distinctes en une seule fiche client.
-- **Notes orateur** : Insister sur ces deux pièges : un bon système de réconciliation ne doit pas seulement rapprocher ce qui se ressemble, il doit avant tout savoir ce qu'il est formellement interdit de fusionner !
+  - **Situation** : Deux conjoints ou un parent et son enfant partagent la même ligne téléphonique ou la même boîte mail de contact.
+  - **Erreur naïve** : Fusionner deux fiches dès qu'un numéro de téléphone concorde.
+  - **Conséquence métier** : Deux personnes réelles regroupées sous un seul contrat.
+- **Notes orateur** : Un bon algorithme de réconciliation doit d'abord savoir ce qu'il est rigoureusement interdit de fusionner.
 
 ---
 
-### Slide 7 — Le pipeline de normalisation canonique
+### Slide 7 — Le pipeline de normalisation : principe des fonctions pures
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `NORMALISATION CANONIQUE · ARCHITECTURE` (Vert `#2EA853`, 10pt gras).
@@ -203,21 +203,22 @@ JOIN tp_assurance_life.clients_life l
 #### Règle d'or appliquée à l'architecture
 - **La donnée brute n'est jamais écrasée ni effacée**.
 - Dans la table consolidée, chaque enregistrement conserve sa colonne brute d'origine ET dispose d'une colonne canonique normalisée (`nom_norm`, `cin_norm`, etc.).
-- Les fonctions de nettoyage sont pures : pour une même entrée, elles retournent toujours exactement la même sortie, sans modifier d'état global.
-- **Notes orateur** : Ce découpage permet de tester chaque fonction unitairement dans `tests/test_normalisation.py` avant de la brancher sur des centaines de milliers de lignes.
+- Chaque fonction pure est isolée et testée dans `tests/test_normalisation.py`.
+- **Notes orateur** : Ce principe garantit l'auditabilité : on peut toujours remonter à l'exacte saisie initiale d'une agence.
 
 ---
 
-### Slide 8 — Implémentation : les fonctions de nettoyage essentielles
+### Slide 8 — Implémentation : extraits de normalisation.py
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `CODE SOURCE · MODULE NORMALISATION.PY` (Vert `#2EA853`, 10pt gras).
 - **Titre** : `Implémentation : extraits de normalisation.py` (Bleu nuit `#1E293B`, 19pt gras).
 - **Sous-titre** : `Robustesse face aux formats exotiques et types inattendus` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Boîte Terminal sombre `#1E293B` (Snippets Python réels du projet)
+#### Boîte Terminal sombre `#1E293B` (Snippets Python réels et commentés)
 ```python
 # src/tp_data_dla/normalisation.py
+
 def normaliser_nom(valeur: Any) -> Optional[str]:
     """Nettoie le patronyme : trim, suppression accents, majuscules."""
     if not valeur:
@@ -241,14 +242,14 @@ def normaliser_date(valeur: Any) -> Optional[str]:
 ```
 
 #### Carte explicative latérale (`#FFFFFF`)
-- Gestion défensive du type `Any` : accepte aussi bien un entier qu'une chaîne ou une instance `datetime`.
-- Les expressions régulières (`re.compile`) sont précompilées au chargement du module pour garantir une vitesse d'exécution optimale.
-- Validation immédiate via la suite de tests : `uv run pytest tests/test_normalisation.py`.
-- **Notes orateur** : Montrer que chaque fonction gère le cas des valeurs absentes (`None`) dès la première ligne pour éviter toute exception en milieu de flux ETL.
+- **Signature `Any`** : Accepte chaîne, entier ou date sans lever d'exception.
+- **Gestion immédiate des `None`** : Sécurité totale face aux valeurs absentes en streaming.
+- **Vérification automatique** : Validation de la suite avec `uv run pytest tests/test_normalisation.py`.
+- **Notes orateur** : Insister sur l'utilisation de regex précompilées (`RE_CHIFFRES`) pour traiter les 400 000 fiches en quelques secondes.
 
 ---
 
-### Slide 9 — Le traitement des prénoms : tokenisation et tri alphabétique
+### Slide 9 — Prénoms composés : tokenisation et tri alphabétique
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `NORMALISATION AVANCÉE · PRÉNOMS COMPOSÉS` (Vert `#2EA853`, 10pt gras).
@@ -282,11 +283,41 @@ tokens = [t for t in RE_ESPACES.split(texte_nettoye) if t]
 prenoms_norm = " ".join(tokens)              # 'TAHINA FALY' (ordre d'origine)
 prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commune)
 ```
-- **Notes orateur** : Souligner que cette règle simple résout à elle seule la très grande majorité des faux négatifs observés sur les prénoms composés malgaches où l'ordre de saisie varie selon les agences.
+- **Notes orateur** : Cette règle très simple élimine à elle seule un gisement majeur de faux négatifs sur les patronymes malgaches.
 
 ---
 
-### Slide 10 — La matrice hiérarchique de rapprochement (C1 à C4)
+### Slide 10 — Introduction au Record Linkage : du nettoyage à la réconciliation
+
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `CONCEPTS FONDAMENTAUX · RECORD LINKAGE` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Record Linkage : pourquoi et comment relier ?` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Passer du nettoyage d'attributs individuels à la réconciliation d'identités réelles` (Gris ardoise `#64748B`, 10.5pt).
+
+#### 1. La problématique fondamentale
+- Nous avons nettoyé les colonnes individuellement (`nom_norm`, `cin_norm`, etc.).
+- **Le défi central** : Comment décider que **deux fiches complètes** issues de bases différentes représentent la **même personne physique**, en l'absence de clé primaire commune ?
+- C'est la discipline du **Record Linkage** (ou Rapprochement d'enregistrements / Résolution d'entités).
+
+#### 2. Les deux grandes écoles de Record Linkage
+```text
+┌──────────────────────────────────────────────┐   ┌──────────────────────────────────────────────┐
+│ 1. Approche Statistique / Probabiliste       │   │ 2. Approche Déterministe par Règles          │
+│ • Modèle classique de Fellegi-Sunter         │   │ • Suite de règles logiques strictes          │
+│ • Poids de vraisemblance et score global     │   │ • Prédicats ordonnés (SI condition ALORS UID)│
+│ • Problème : effet boîte noire, difficile    │   │ • Explicabilité totale, motif tracé en base  │
+│   à justifier devant un régulateur ou client │   │ • Auditabilité absolue à tout moment         │
+└──────────────────────────────────────────────┘   └──────────────────────────────────────────────┘
+```
+
+#### 3. Notre choix stratégique : L'approche déterministe hiérarchique
+- **Exigence métier & légale** : Dans l'assurance, une fusion de contrats doit être **justifiable et prouvée**.
+- **Architecture retenue** : Une cascade de règles déterministes (`C1` à `C4`) avec verrou de sécurité, complétée par une file d'arbitrage humain pour les cas ambigus.
+- **Notes orateur** : Souligner que l'approche statistique produit des scores de confiance (ex: 82%) insuffisants pour garantir les droits juridiques d'un assuré sans validation humaine.
+
+---
+
+### Slide 11 — La matrice hiérarchique de rapprochement (C1 à C4)
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `MOTEUR DE RÉCONCILIATION · MATRICE HIÉRARCHIQUE` (Vert `#2EA853`, 10pt gras).
@@ -323,7 +354,7 @@ prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commu
 
 ---
 
-### Slide 11 — Le verrou absolu anti-conflit de CIN
+### Slide 12 — Le verrou absolu anti-conflit de CIN
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `SÉCURITÉ ALGORITHMIQUE · VERROU INFRANGIBLE` (Vert `#2EA853`, 10pt gras).
@@ -363,7 +394,7 @@ prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commu
 
 ---
 
-### Slide 12 — Rapprochement flou adaptatif : attraper les fautes de frappe
+### Slide 13 — Rapprochement flou adaptatif : attraper les fautes de frappe
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `ALGORITHMIQUE · RAPPROCHEMENT FLOU` (Vert `#2EA853`, 10pt gras).
@@ -387,7 +418,7 @@ prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commu
 
 ---
 
-### Slide 13 — Routage métier : Automatique vs File de validation humaine
+### Slide 14 — Routage des décisions : automatique vs arbitrage humain
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `ARBITRAGE MÉTIER · ROUTAGE À 3 VOIES` (Vert `#2EA853`, 10pt gras).
@@ -419,7 +450,7 @@ prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commu
 
 ---
 
-### Slide 14 — Cas complexes : le pont transitif de la cohorte commune
+### Slide 15 — Cas complexes : les 331 ponts de la cohorte commune
 
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `CAS COMPLEXES · TRANSITIVITÉ MULTI-SOURCES` (Vert `#2EA853`, 10pt gras).
@@ -455,7 +486,7 @@ prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commu
 
 ---
 
-### Slide 15 — Bilan de la séance & Cap sur la Partie 3 (Pipeline ETL)
+### Slide 16 — Bilan de la Partie 2 & Cap sur l'ETL (Partie 3)
 
 - **Arrière-plan** : Bleu ITU sombre (`#283A97`).
 - **Badge supérieur** : `BILAN DE SÉANCE · PERSPECTIVES ÉTAPE 3` (Vert citron `#B2D235`, 10pt gras).
@@ -463,10 +494,11 @@ prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commu
 - **Sous-titre** : `Nos règles sont formalisées, place à l'ingestion industrielle en streaming` (Bleu très clair `#CADCFC`, 11pt).
 
 #### 2 cartes récapitulatives contrastées
-- **Carte gauche : Checklist des acquis de la Partie 2 (`#1E293B`, bordure `#334155`)** :
+- **Carte gauche : Acquis validés de la séance (`#1E293B`, bordure `#334155`)** :
   - `[X]` Profilage des 3 sources dans `notebooks/01_exploration.ipynb`.
   - `[X]` Module `normalisation.py` opérationnel (fonctions pures testées avec pytest).
   - `[X]` Tokenisation et tri alphabétique des prénoms validés.
+  - `[X]` Choix et justification du Record Linkage déterministe.
   - `[X]` Matrice de décision hiérarchique `C1` à `C4` formalisée.
   - `[X]` Verrou de sécurité anti-conflit de CIN intégré à l'arbre logique.
 - **Carte droite : Ce qui nous attend en Partie 3 (`#1E293B`, bordure `#334155`)** :
