@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Explorateur des groupes UID · Référentiel NEW_ID{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2>Explorateur de groupes UID &amp; Recherche multicritères</h2>
+  <p style="margin-bottom: 1rem; color: var(--color-text-muted);">
+    Recherchez par <strong>UID universel</strong>, <strong>référence source</strong> (ex: <code>1000001</code>, <code>3000001</code>, <code>EXT-5000001</code>), <strong>numéro de CIN</strong>, <strong>nom</strong>, <strong>téléphone</strong> ou <strong>courriel</strong>.
+  </p>
+
+  <form method="get" action="/recherche" class="search-bar">
+    <input type="text" name="q" value="{{ q }}" placeholder="Ex: Ramanitra, EXT-5000001, 800005316023, 009539711..." class="input-text" required autofocus>
+    <button type="submit" class="btn btn-primary">Rechercher</button>
+  </form>
+
+  {% if q %}
+    <div style="margin-bottom: 1rem; font-size: 0.9rem;">
+      <strong>{{ total_trouve }}</strong> groupe(s) correspondant à « <em>{{ q }}</em> »
+    </div>
+
+    {% if resultats %}
+      <div class="table-wrapper" tabindex="0" role="region" aria-label="Résultats de recherche">
+        <table>
+          <thead>
+            <tr>
+              <th>UID (NEW_ID)</th>
+              <th>Fiches</th>
+              <th>Sources</th>
+              <th>Nom &amp; Prénoms</th>
+              <th>CIN</th>
+              <th class="col-date">Date naiss.</th>
+              <th>Ville</th>
+              <th class="col-action">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for g in resultats %}
+            <tr>
+              <td class="code-mono"><strong>{{ g[0] }}</strong></td>
+              <td><span class="badge badge-succes">{{ g[1] }} fiche{% if g[1] > 1 %}s{% endif %}</span></td>
+              <td>
+                <div class="badges-container">
+                  {% for src in g[2] %}
+                    <span class="badge badge-{{ src.lower() }}">{{ src }}</span>
+                  {% endfor %}
+                </div>
+              </td>
+              <td><strong>{{ g[4] or '' }}</strong> {{ g[5] or '' }}</td>
+              <td class="code-mono">{{ g[3] or '-' }}</td>
+              <td class="col-date">{{ g[6] or '-' }}</td>
+              <td>{{ g[7] or '-' }}</td>
+              <td class="col-action">
+                <a href="/groupes/{{ g[0] }}" class="btn btn-secondary btn-sm">Voir fiches &rarr;</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--color-text-muted);">Aucun groupe trouvé pour ce critère.</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

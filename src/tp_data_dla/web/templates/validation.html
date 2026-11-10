@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}File de validation humaine · Référentiel NEW_ID{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2>File de validation humaine &amp; Arbitrage des cas ambigus</h2>
+  <p style="margin-bottom: 1rem; color: var(--color-text-muted);">
+    Conformément aux principes de gouvernance, les correspondances partielles à 50 % (ex. conjoints ou enfants partageant un téléphone ou e-mail) et les paires présentant un conflit de CIN sont isolées ici pour examen humain.
+  </p>
+
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+    <a href="/validation?statut=A_VALIDER" class="btn {% if statut == 'A_VALIDER' and not motif %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">À valider (Tous)</a>
+    <a href="/validation?statut=A_VALIDER&motif=CONFLIT_CIN" class="btn {% if motif == 'CONFLIT_CIN' %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">Conflits CIN</a>
+    <a href="/validation?statut=A_VALIDER&motif=SUSPICION_FAUTE_CIN" class="btn {% if motif == 'SUSPICION_FAUTE_CIN' %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">Suspicions CIN (75 %)</a>
+    <a href="/validation?statut=A_VALIDER&motif=AMBIGU_C4A" class="btn {% if motif == 'AMBIGU_C4A' %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">Ambigus C4a (Tél)</a>
+    <a href="/validation?statut=A_VALIDER&motif=AMBIGU_C4B" class="btn {% if motif == 'AMBIGU_C4B' %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">Ambigus C4b (Mail)</a>
+    <a href="/validation?statut=A_VALIDER&motif=AMBIGU_FLOU_CONTACT" class="btn {% if motif == 'AMBIGU_FLOU_CONTACT' %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">Flou Contacts</a>
+    <a href="/validation?statut=VALIDE_HUMAIN" class="btn {% if statut == 'VALIDE_HUMAIN' %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">Confirmés</a>
+    <a href="/validation?statut=REJETE_HUMAIN" class="btn {% if statut == 'REJETE_HUMAIN' %}btn-primary{% else %}btn-secondary{% endif %}" style="text-decoration: none;">Rejetés</a>
+  </div>
+
+  <p style="font-size: 0.9rem; margin-bottom: 1rem;">
+    <strong>{{ total }}</strong> cas trouvé(s) pour le filtre sélectionné.
+  </p>
+
+  {% if cas %}
+    {% for c in cas %}
+    <div class="card" style="border-left: 4px solid {% if c[5] == 'CONFLIT_CIN' %}var(--color-danger){% elif c[5] == 'SUSPICION_FAUTE_CIN' %}#6366f1{% else %}var(--color-accent){% endif %}; margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
+        <div>
+          <span class="badge {% if c[5] == 'CONFLIT_CIN' %}badge-conflit{% elif c[5] == 'SUSPICION_FAUTE_CIN' %}badge-suspicion{% else %}badge-ambigu{% endif %}">{{ c[5] }}</span>
+          <span style="font-weight: 600; margin-left: 0.5rem;">Cas #{{ c[0] }} (Règle : {{ c[6] }} · Score : {{ c[7] }} %)</span>
+        </div>
+        <div>
+          Statut : <span class="badge badge-succes">{{ c[8] }}</span>
+        </div>
+      </div>
+
+      <div class="compare-grid">
+        <div class="compare-card">
+          <h4>Fiche A · <span class="badge badge-{{ c[10].lower() }}">{{ c[10] }}</span> Réf: <code>{{ c[11] }}</code></h4>
+          <div class="compare-item"><span>UID actuel :</span><span class="code-mono">{{ c[3] }}</span></div>
+          <div class="compare-item"><span>Nom &amp; Prénoms :</span><strong>{{ c[12] or '-' }} {{ c[13] or '-' }}</strong></div>
+          <div class="compare-item"><span>CIN brut :</span><span class="code-mono">{{ c[14] or '-' }}</span></div>
+          <div class="compare-item"><span>Téléphone :</span><code>{{ c[15] or '-' }}</code></div>
+          <div class="compare-item"><span>E-mail :</span><code style="font-size: 0.8rem;">{{ c[16] or '-' }}</code></div>
+        </div>
+
+        <div class="compare-card">
+          <h4>Fiche B · <span class="badge badge-{{ c[17].lower() }}">{{ c[17] }}</span> Réf: <code>{{ c[18] }}</code></h4>
+          <div class="compare-item"><span>UID actuel :</span><span class="code-mono">{{ c[4] }}</span></div>
+          <div class="compare-item"><span>Nom &amp; Prénoms :</span><strong>{{ c[19] or '-' }} {{ c[20] or '-' }}</strong></div>
+          <div class="compare-item"><span>CIN brut :</span><span class="code-mono">{{ c[21] or '-' }}</span></div>
+          <div class="compare-item"><span>Téléphone :</span><code>{{ c[22] or '-' }}</code></div>
+          <div class="compare-item"><span>E-mail :</span><code style="font-size: 0.8rem;">{{ c[23] or '-' }}</code></div>
+        </div>
+      </div>
+
+      {% if c[8] == 'A_VALIDER' %}
+      <form method="post" action="/api/validation/{{ c[0] }}/decision" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--color-border);">
+        <input type="text" name="note" placeholder="Note ou justification d'arbitrage..." class="input-text" style="flex: 2; min-width: 250px;">
+        <button type="submit" name="action" value="ASSIGNER_MEME_UID" class="btn btn-success">
+          Attribuer le même UID (Regrouper)
+        </button>
+        <button type="submit" name="action" value="MAINTENIR_SEPARES" class="btn btn-danger">
+          Maintenir séparés (Rejeter)
+        </button>
+      </form>
+      {% else %}
+        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 0.5rem;">
+          Décision enregistrée : <em>{{ c[9] or 'Sans note' }}</em>
+        </p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p style="color: var(--color-text-muted);">Aucun cas dans cette catégorie.</p>
+  {% endif %}
+</div>
+{% endblock %}

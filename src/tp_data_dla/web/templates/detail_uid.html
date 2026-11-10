@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Détail Groupe {{ uid }} · Référentiel NEW_ID{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <span class="badge badge-succes" style="font-size: 0.85rem;">Groupe consolidé · {{ groupe[1] }} fiche{% if groupe[1] > 1 %}s{% endif %} rattachée{% if groupe[1] > 1 %}s{% endif %}</span>
+      <h2 style="margin: 0.5rem 0; border: none; padding: 0;">UID : <span class="code-mono">{{ uid }}</span></h2>
+      <p style="color: var(--color-text-muted); font-size: 0.9rem;">
+        Identité de référence : <strong>{{ groupe[4] or '' }} {{ groupe[5] or '' }}</strong> · CIN : <code>{{ groupe[3] or 'Non renseigné' }}</code> · Né(e) le : {{ groupe[6] or '-' }} à {{ groupe[7] or '-' }}
+      </p>
+    </div>
+    <div>
+      <a href="/recherche" class="btn btn-secondary" style="text-decoration: none;">&larr; Retour à l'explorateur</a>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Fiches sources individuelles rattachées à cet UID</h2>
+  <p style="margin-bottom: 1rem; color: var(--color-text-muted);">
+    <strong>Principe de non-altération :</strong> Chaque ligne ci-dessous est une fiche d'origine conservée telle quelle, consultable avec sa référence et ses valeurs brutes.
+  </p>
+
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Fiches sources individuelles">
+    <table>
+      <thead>
+        <tr>
+          <th>Système source</th>
+          <th>Réf. locale d'origine</th>
+          <th>CIN brut</th>
+          <th>Nom brut</th>
+          <th>Prénoms bruts</th>
+          <th class="col-date">Naissance brute</th>
+          <th>Lieu brut</th>
+          <th>Ville brute</th>
+          <th>Contact (Tél / Mail)</th>
+          <th>Attributs métier d'origine</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in fiches %}
+        <tr>
+          <td><span class="badge badge-{{ f[1].lower() }}">{{ f[1] }}</span></td>
+          <td class="code-mono"><strong>{{ f[2] }}</strong></td>
+          <td class="code-mono">{{ f[3] or '-' }}</td>
+          <td>{{ f[4] or '-' }}</td>
+          <td>{{ f[5] or '-' }}</td>
+          <td class="col-date">{{ f[6] or '-' }}</td>
+          <td>{{ f[7] or '-' }}</td>
+          <td>{{ f[8] or '-' }}</td>
+          <td>
+            <div style="font-size: 0.8rem;">
+              {% if f[9] %}<div>Tél : <code>{{ f[9] }}</code></div>{% endif %}
+              {% if f[10] %}<div>Mail : <code>{{ f[10] }}</code></div>{% endif %}
+            </div>
+          </td>
+          <td>
+            <details style="font-size: 0.8rem; cursor: pointer;">
+              <summary>Voir détails métier</summary>
+              <pre class="code-mono" style="background: #f8fafc; padding: 0.5rem; border-radius: 4px; margin-top: 0.25rem;">{{ f[12] }}</pre>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Comparaison des valeurs normalisées (moteur de rapprochement)</h2>
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Données comparables normalisées">
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Réf.</th>
+          <th>cin_norm</th>
+          <th>nom_norm</th>
+          <th>prenoms_trie_norm</th>
+          <th>date_naiss_norm</th>
+          <th>lieu_naiss_norm</th>
+          <th>ville_norm</th>
+          <th>tel_norm</th>
+          <th>mail_norm</th>
+          <th>sexe_norm</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in fiches %}
+        <tr>
+          <td><span class="badge badge-{{ f[1].lower() }}">{{ f[1] }}</span></td>
+          <td class="code-mono">{{ f[2] }}</td>
+          <td class="code-mono">{{ f[13] or '-' }}</td>
+          <td><strong>{{ f[14] or '-' }}</strong></td>
+          <td>{{ f[16] or '-' }}</td>
+          <td>{{ f[17] or '-' }}</td>
+          <td>{{ f[18] or '-' }}</td>
+          <td>{{ f[19] or '-' }}</td>
+          <td class="code-mono">{{ f[20] or '-' }}</td>
+          <td class="code-mono" style="font-size: 0.8rem;">{{ f[21] or '-' }}</td>
+          <td><span class="badge badge-{{ 'auto' if f[22] == 'M' else 'life' }}">{{ f[22] or '-' }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if cas_validation %}
+<div class="card">
+  <h2>Signalements ou cas de validation associés</h2>
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Cas de validation associés">
+    <table>
+      <thead>
+        <tr>
+          <th>ID Cas</th>
+          <th>Fiche A</th>
+          <th>Fiche B</th>
+          <th>Motif</th>
+          <th>Règle</th>
+          <th>Statut</th>
+          <th>Note de décision</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cas_validation %}
+        <tr>
+          <td>#{{ c[0] }}</td>
+          <td><code>{{ c[1] }}</code></td>
+          <td><code>{{ c[2] }}</code></td>
+          <td>
+            <span class="badge {% if c[3] == 'CONFLIT_CIN' %}badge-conflit{% else %}badge-ambigu{% endif %}">{{ c[3] }}</span>
+          </td>
+          <td>{{ c[4] }}</td>
+          <td><span class="badge badge-succes">{{ c[6] }}</span></td>
+          <td>{{ c[7] or '-' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

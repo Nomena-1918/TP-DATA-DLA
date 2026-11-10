@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord · Référentiel NEW_ID{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2>Volumétries et principes de gouvernance du dédoublonnage</h2>
+  <p style="margin-bottom: 1rem; color: var(--color-text-muted);">
+    <strong>Règle d'or :</strong> Aucune ligne n'est supprimée ou fusionnée physiquement. Les <strong>{{ "{:,}".format(total).replace(",", " ") }}</strong> fiches sources individuelles sont intégralement préservées dans la base cible et reçoivent le même identifiant unique (<code>uid</code> / <code>NEW_ID</code>) pour permettre leur regroupement instantané.
+  </p>
+
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">Fiches sources intactes</div>
+      <div class="stat-value">{{ "{:,}".format(total).replace(",", " ") }}</div>
+      <div class="stat-sub">100 % conservées sans altération</div>
+    </div>
+    <div class="stat-box stat-secondary">
+      <div class="stat-label">Personnes physiques (UIDs)</div>
+      <div class="stat-value">{{ "{:,}".format(uids_cnt).replace(",", " ") }}</div>
+      <div class="stat-sub">Identifiants pivots universels (UUID)</div>
+    </div>
+    <div class="stat-box stat-accent">
+      <div class="stat-label">Fiches avec UID assigné</div>
+      <div class="stat-value">{{ "{:,}".format(uid_non_null).replace(",", " ") }}</div>
+      <div class="stat-sub">Couverture du pipeline</div>
+    </div>
+    <div class="stat-box {% if val_a_traiter > 0 %}stat-danger{% else %}stat-secondary{% endif %}">
+      <div class="stat-label">File de validation humaine</div>
+      <div class="stat-value">{{ "{:,}".format(val_a_traiter).replace(",", " ") }}</div>
+      <div class="stat-sub">{{ conflits_cin }} conflits CIN · {{ suspicions_cin }} suspicions CIN · {{ ambigus_c4 }} ambigus</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Répartition des fiches sources par système</h2>
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">Pôle Auto (PostgreSQL)</div>
+      <div class="stat-value">{{ "{:,}".format(auto_cnt).replace(",", " ") }}</div>
+      <div class="stat-sub"><span class="badge badge-auto">AUTO</span> Table tp_assurance.clients_auto</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Pôle Life (MySQL)</div>
+      <div class="stat-value">{{ "{:,}".format(life_cnt).replace(",", " ") }}</div>
+      <div class="stat-sub"><span class="badge badge-life">LIFE</span> Table clients_life (retraite &amp; vie)</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Pôle Autre (CSV)</div>
+      <div class="stat-value">{{ "{:,}".format(autre_cnt).replace(",", " ") }}</div>
+      <div class="stat-sub"><span class="badge badge-autre">AUTRE</span> Plateformes agricole &amp; maritime</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Distribution des groupes par nombre de fiches rattachées</h2>
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Distribution des tailles de groupes">
+    <table>
+      <thead>
+        <tr>
+          <th>Fiches par personne</th>
+          <th>Nombre de groupes UID</th>
+          <th>Interprétation métier</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nb, cnt in distribution_tailles %}
+        <tr>
+          <td><strong>{{ nb }} fiche{% if nb > 1 %}s{% endif %}</strong></td>
+          <td>{{ "{:,}".format(cnt).replace(",", " ") }} personnes</td>
+          <td>
+            {% if nb == 1 %}
+              Client présent sur un seul produit / dossier (singleton)
+            {% elif nb == 2 %}
+              Client multi-produits ou doublon intra-système
+            {% elif nb == 3 %}
+              Client de la cohorte commune (présent dans Auto, Life et Autre)
+            {% else %}
+              Client multi-produits avec dossiers supplémentaires
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if derniers_runs %}
+<div class="card">
+  <h2>Historique récent des exécutions du pipeline</h2>
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Historique des runs">
+    <table>
+      <thead>
+        <tr>
+          <th>Phase</th>
+          <th>Statut</th>
+          <th>Durée</th>
+          <th>Lignes traitées</th>
+          <th>Détails</th>
+          <th>Horodatage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in derniers_runs %}
+        <tr>
+          <td><strong>{{ r[0] }}</strong></td>
+          <td><span class="badge badge-succes">{{ r[1] }}</span></td>
+          <td>{{ r[2] }} s</td>
+          <td>{{ "{:,}".format(r[3] or 0).replace(",", " ") }}</td>
+          <td class="code-mono" style="font-size: 0.8rem;">{{ r[4] }}</td>
+          <td>{{ r[5].strftime("%Y-%m-%d %H:%M:%S") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
