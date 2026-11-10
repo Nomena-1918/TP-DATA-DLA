@@ -1,136 +1,150 @@
-# TP Data D.L.A
+# TP Data D.L.A — Réconciliation d'Identités Clients & Référentiel Unique (`UID`)
 
-TP de licence sur le rapprochement de fiches clients, dans un scénario
-d’assurance fictif à Madagascar. Auto est sur PostgreSQL 16 et Life sur MySQL
-8.4, avec un million de fiches chacune après chargement. Autre est un CSV de
-deux millions de fiches agricoles et maritimes.
+TP de licence en informatique sur le rapprochement de fiches clients et la conception d'un référentiel pivot unique (`UID`), dans un scénario d’assurance fictif à Madagascar.
+
+Afin de garantir une exécution fluide et rapide sur les postes de travail des étudiants sans saturer la mémoire vive ni le processeur, le TP s'appuie exclusivement sur la **version légère (400 000 fiches au total)** :
+- **Auto** : PostgreSQL 16 (100 000 fiches d'assurance automobile).
+- **Life** : MySQL 8.4 (100 000 fiches d'épargne vie et retraite).
+- **Autre** : Fichier plat CSV de 200 000 fiches (100 000 fiches agricoles et 100 000 maritimes).
 
 | Emplacement | Contenu |
 | --- | --- |
-| [docs/etudiant/](docs/etudiant/) | Énoncé de découverte des sources. |
-| [docs/enseignant/](docs/enseignant/) | Procédure de préparation et détails de génération. |
-| [notebooks/01_exploration.ipynb](notebooks/01_exploration.ipynb) | Exploration en lecture seule des trois sources. |
-| `data/` | CSV Autre livré localement. Le fichier volumineux est ignoré par Git. |
-| [scripts/](scripts/) | Générateur déterministe du CSV Autre. |
-| [sql/](sql/) | Scripts de chargement Auto (PostgreSQL 16) et Life (MySQL 8.4). |
-| `main.py` | Point de départ du projet Python. |
+| [docs/etudiant/ENONCE-TP.md](docs/etudiant/ENONCE-TP.md) | Énoncé complet du TP et description détaillée des sources. |
+| [docs/etudiant/FICHE-DECOUVERTE.md](docs/etudiant/FICHE-DECOUVERTE.md) | Grille d'exploration et de relevé des anomalies. |
+| [docs/etudiant/REGLES-RAPPROCHEMENT.md](docs/etudiant/REGLES-RAPPROCHEMENT.md) | Matrice de décision C1–C4, verrou anti-conflit CIN et seuils flous. |
+| [docs/enseignant/](docs/enseignant/) | Procédures de préparation, blueprints des slides et détails de génération. |
+| [notebooks/01_exploration.ipynb](notebooks/01_exploration.ipynb) | Notebook d'exploration en lecture seule des trois sources. |
+| `data/clients_autre.csv` | CSV Autre (version légère 200k fiches). |
+| [scripts/](scripts/) | Générateur déterministe (`generer_autre.py`) et script d'audit qualité (`evaluer_qualite.py`). |
+| [sql/leger/](sql/leger/) | Scripts de chargement rapide Auto (PostgreSQL 16) et Life (MySQL 8.4). |
+| `src/tp_data_dla/` | Module applicatif Python (normalisation, ETL streaming, Union-Find et application Web). |
 
-## Installer l’environnement Python
+---
 
-Utiliser Python 3.12 ou supérieur et `uv`. Le projet conserve sa version et sa
-contrainte Python d’origine. Depuis la racine, synchroniser l’environnement
-avec le fichier `uv.lock`, puis vérifier les imports sans ouvrir de connexion.
+## 1. Prérequis et installation de l’environnement Python
 
+Le projet nécessite **Python >= 3.12** et le gestionnaire d'environnements **`uv`** (Astral).
+
+Depuis la racine du projet, synchronisez l'environnement verrouillé :
 ```sh
 uv sync --locked --python 3.12
-uv run --locked python -c 'import psycopg, mysql.connector; print(psycopg.__version__, mysql.connector.__version__)'
 ```
 
-Par défaut, `uv` utilise `.venv/`. Si l’IDE pointe déjà vers `venv/`,
-exécuter `export UV_PROJECT_ENVIRONMENT=venv` dans le terminal avant les
-commandes `uv`. [Environnements de projet uv](https://docs.astral.sh/uv/concepts/projects/config/)
+Vérifiez immédiatement la disponibilité des pilotes relationnels sans ouvrir de connexion :
+```sh
+uv run --locked python -c "import psycopg, mysql.connector; print('Pilotes PostgreSQL et MySQL opérationnels !')"
+```
 
-`psycopg[binary]` fournit le pilote PostgreSQL, importé par `psycopg`.
-`mysql-connector-python` fournit `mysql.connector` pour Life sur MySQL 8.4.
-Conserver les paramètres de connexion dans
-l’environnement local. [Installation de Psycopg](https://www.psycopg.org/install/) · [Versions de MySQL Connector/Python](https://dev.mysql.com/doc/connector-python/en/connector-python-versions.html)
+> [!TIP]
+> Par défaut, `uv` gère son environnement virtuel sous `.venv/`. Si votre IDE utilise un dossier `venv/` existant, vous pouvez définir `export UV_PROJECT_ENVIRONMENT=venv` dans votre terminal avant de lancer les commandes `uv`.
 
-## Lancer le notebook d’exploration
+---
 
-Depuis la racine du projet, installer le groupe optionnel `notebook`.
-Remplacer les noms d’utilisateur d’exemple par ceux des comptes en lecture
-fournis pour le TP. Adapter les adresses et ports si les bases ne sont pas
-sur la machine locale.
+## 2. Charger les bases de données locales (Auto et Life)
 
+Préparez les deux bases dédiées sur vos moteurs SGBD locaux :
+- PostgreSQL 16 (port 5432) : base `tp_assurance_auto` (encodage `UTF-8`).
+- MySQL 8.4 (port 3306) : base `tp_assurance_life` (encodage `utf8mb4`).
+
+Exécutez les scripts de chargement de la version légère depuis la racine du projet :
+```sh
+# Chargement de la source Auto (100 000 fiches sur PostgreSQL 16)
+psql -X -d tp_assurance_auto -f sql/leger/charger_auto_postgresql.sql
+
+# Chargement de la source Life (100 000 fiches sur MySQL 8.4)
+mysql --batch --skip-force --default-character-set=utf8mb4 \
+  --database=tp_assurance_life < sql/leger/charger_life_mysql.sql
+```
+
+Contrôlez les volumes et les plages d'identifiants créés :
+```sh
+psql -X -d tp_assurance_auto -c \
+  'SELECT count(*), min(id_client_auto), max(id_client_auto) FROM tp_assurance.clients_auto;'
+mysql --default-character-set=utf8mb4 --database=tp_assurance_life \
+  --execute='SELECT count(*), min(ref_adherent), max(ref_adherent) FROM tp_assurance_life.clients_life;'
+```
+
+Résultats attendus :
+- **Auto** : `100 000` fiches, plage de `1 000 001` à `1 100 000`.
+- **Life** : `100 000` fiches, plage de `3 000 001` à `3 100 000`.
+
+---
+
+## 3. Générer ou vérifier la source plate Autre (CSV)
+
+Le fichier `data/clients_autre.csv` est encodé en UTF-8, avec une ligne d'en-tête et un séparateur point-virgule (`;`). Il comprend **200 000 fiches** (100 000 agricoles et 100 000 maritimes).
+
+Pour vérifier son volume :
+```python
+import csv
+from pathlib import Path
+
+with Path("data/clients_autre.csv").open(encoding="utf-8", newline="") as f:
+    lecteur = csv.DictReader(f, delimiter=";")
+    print(sum(1 for _ in lecteur))  # Affiche 200000
+```
+
+Si le fichier n'est pas encore présent, générez-le directement en mode léger :
+```sh
+python3 scripts/generer_autre.py --mode leger --sortie data/clients_autre.csv
+wc -l data/clients_autre.csv
+```
+La commande `wc -l` doit retourner **200 001 lignes** (200 000 enregistrements de données + 1 ligne d'en-tête).
+
+---
+
+## 4. Lancer le notebook d’exploration (Partie 1)
+
+Installez les dépendances du groupe optionnel `notebook` :
 ```sh
 uv sync --locked --python 3.12 --group notebook
+```
+
+Configurez vos identifiants d'accès dans le fichier `.env` (en vous basant sur `.env.example`) ou exportez les variables d'environnement, puis démarrez JupyterLab :
+```sh
 export TP_AUTO_HOST=127.0.0.1 TP_AUTO_PORT=5432 TP_AUTO_USER=lecteur_auto
 export TP_LIFE_HOST=127.0.0.1 TP_LIFE_PORT=3306 TP_LIFE_USER=lecteur_life
 uv run --locked --group notebook jupyter lab --ip=127.0.0.1
 ```
 
-Ouvrir `notebooks/01_exploration.ipynb` avec le noyau Python 3 et exécuter
-les cellules dans l’ordre. Les variables `TP_AUTO_PASSWORD` et
-`TP_LIFE_PASSWORD` peuvent être fournies par l’environnement du processus.
-Sinon, le noyau demande les mots de passe dans une saisie masquée.
+Ouvrez `notebooks/01_exploration.ipynb` et exécutez les cellules dans l'ordre pour relever les hétérogénéités de formats et compléter `docs/etudiant/FICHE-DECOUVERTE.md`.
 
-Le mode rapide affiche les types et des échantillons bornés. Pour le
-profil complet, définir `PROFIL_COMPLET = True` dans la cellule de
-configuration ou lancer JupyterLab avec `TP_PROFIL_COMPLET=1`. Les
-bases calculent les agrégats et le CSV est parcouru une seule fois.
-Le chemin du CSV est résolu depuis la racine du projet ou depuis `notebooks/`.
+---
 
-## Lire ou reproduire Autre
+## 5. Exécuter le pipeline complet de réconciliation
 
-Le CSV `data/clients_autre.csv` est en UTF-8, avec une ligne d’en-tête et
-des champs séparés par des points-virgules. Le module standard `csv` lit les
-fiches en flux et conserve les valeurs sous forme de texte.
-La dernière colonne, `code_sexe`, contient `M` (masculin) ou `F` (féminin).
-
-```python
-import csv
-from pathlib import Path
-
-with Path("data/clients_autre.csv").open(encoding="utf-8", newline="") as fichier:
-    fiches = csv.DictReader(fichier, delimiter=";")
-    print(sum(1 for _ in fiches))  # 2 000 000
-```
-
-Si le CSV manque, le générateur le crée avec la bibliothèque standard depuis
-la racine du projet. Cette commande remplace le CSV s’il existe déjà.
+Le pilotage du pipeline s'effectue via l'outil en ligne de commande `tp-dla` :
 
 ```sh
-python3 scripts/generer_autre.py
-wc -l data/clients_autre.csv
-shasum -a 256 data/clients_autre.csv
-```
+# 1. Initialiser le schéma cible dans tp_assurance_etl (sans colonne uid)
+uv run tp-dla init-db
 
-`wc -l` doit indiquer 2 000 001 lignes, en-tête compris. L’empreinte de
-référence figure dans la [notice enseignant](docs/enseignant/PREPARATION-ENSEIGNANT.md).
+# 2. Extraire, normaliser et charger les 400 000 fiches en streaming
+uv run tp-dla etl --dataset leger
 
-## Charger Auto et Life manuellement
+# 3. Ajouter manuellement la colonne pivot UID (Phase 4)
+uv run tp-dla add-uid-column
 
-Sur la machine de l’enseignant, préparer `tp_assurance_auto` en UTF-8
-sur PostgreSQL 16 et `tp_assurance_life` en `utf8mb4` sur MySQL 8.4. Depuis
-la racine, utiliser les deux commandes avec les paramètres de connexion du TP.
-La [notice enseignant](docs/enseignant/PREPARATION-ENSEIGNANT.md) détaille les
-droits requis, les contrôles après chargement et la reprise en cas d’erreur.
+# 4. Exécuter le moteur Union-Find (passes exactes C1-C3 et passe floue adaptative)
+uv run tp-dla union-find
 
-```sh
-psql -X -d tp_assurance_auto -f sql/charger_auto_postgresql.sql
-mysql --batch --skip-force --default-character-set=utf8mb4 \
-  --database=tp_assurance_life < sql/charger_life_mysql.sql
-```
+# 5. Créer les index finaux
+uv run tp-dla create-indexes
 
-## Relancer le pipeline et ouvrir la validation
+# 6. Évaluer la précision, le rappel et la pureté des clusters formés
+uv run python scripts/evaluer_qualite.py
 
-`init-db` crée les tables manquantes et conserve les tables existantes.
-L’ETL charge les trois sources dans une seule transaction et exige une
-cible vide. Union-Find publie également ses résultats dans une seule
-transaction et refuse de recalculer des UID déjà publiés. Pour refaire
-un parcours complet, utiliser une base de test dédiée et vide en
-configurant `TP_ETL_DB`.
-
-Renseigner les identifiants de base dans `.env` ou dans l’environnement.
-Pour ouvrir la file de validation, configurer aussi `TP_VALIDATION_USER`
-et `TP_VALIDATION_PASSWORD`. Le navigateur demande ces identifiants à
-l’ouverture de la file. Lancer l’application sur la boucle locale.
-
-```sh
-chmod 600 .env
+# 7. Lancer la mini-application Web de consultation 360° et de validation humaine
 uv run tp-dla web --host 127.0.0.1 --port 8000
 ```
 
-Pour tester les relances et les arbitrages, sélectionner une base de test
-vide dont le nom commence par `tp_dla_test_`, puis lancer `init-db` et
-`TP_TEST_ECRITURE=1 uv run pytest`. Le test y écrit des fiches fictives.
+Accessible depuis votre navigateur sur `http://127.0.0.1:8000`.
 
-## Distribuer les fichiers
+---
 
-Pour la découverte, remettre [l’énoncé étudiant](docs/etudiant/ENONCE-TP.md)
-à la racine du dossier de distribution, avec le CSV sous
-`data/clients_autre.csv`, le notebook sous `notebooks/` et les accès en
-lecture à PostgreSQL et MySQL. Fournir aussi `pyproject.toml`, `uv.lock`
-et la section de lancement du README.
-Les documents de préparation, les scripts SQL et le générateur restent côté
-enseignant.
+## 6. Exécution des tests automatisés
+
+Lancez la suite de tests unitaires et de validation :
+```sh
+uv run pytest
+```
