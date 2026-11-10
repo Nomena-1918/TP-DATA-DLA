@@ -1,13 +1,14 @@
 # Blueprint des slides — Partie 2 : Exploration, Nettoyage & Règles de rapprochement
 
-Ce document définit le plan détaillé de la **Présentation 2** sur les 5 présentations prévues pour le TP Data D.L.A. Elle guide les étudiants dans l'exploration active des trois sources via le notebook Jupyter, la caractérisation des hétérogénéités et des anomalies réelles, l'écriture des fonctions pures de normalisation, et la conception de la matrice hiérarchique de rapprochement d'identités (`UID`) avec son verrou anti-conflit.
+Ce document définit le plan détaillé de la **Présentation 2** sur les 5 présentations prévues pour le TP Data D.L.A. Conçu pour être accessible, visuel et pédagogique, il guide les étudiants dans l'exploration active des trois sources de données via le notebook Jupyter, la caractérisation des disparités de formats et des anomalies de saisie, l'écriture des fonctions pures de normalisation, et la conception de la matrice hiérarchique de rapprochement d'identités (`UID`) avec son verrou de sécurité anti-conflit.
 
-> **Règles de rédaction du support**
+> **Règles de rédaction & Identité visuelle**
 > - **Anonymisation stricte** : scénario présenté uniquement comme une compagnie d'assurance fictive à Madagascar ; aucune mention d'entreprise réelle ni de cabinet de conseil ; identifiant pivot nommé exclusivement `UID`.
 > - **Dimensionnement local unique** : seuls les chiffres du jeu de travail léger (400 000 fiches au total, 100k Auto, 100k Life, 200k Autre, 70k cohorte commune, 256k population théorique) sont mentionnés.
-> - **Accessibilité pour tous** : formulations naturelles, simples et directes ; suppression du jargon mathématique abstrait ; bannissement des répétitions de « 100 % » et de « coquilles » (synonymes variés).
-> - **Visuels & Code snippets** : privilégier les schémas conceptuels, diagrammes de décision et boîtes de code style terminal sombre (`#1E293B`) avec coloration claire.
-> - **Notes orateur** : repères oraux concrets pour chaque diapositive.
+> - **Accessibilité pour tous** : formulations naturelles, simples et directes ; chaque concept mathématique ou algorithmique est expliqué par son intuition concrète ; bannissement des répétitions de pourcentages excessifs et de « coquilles » (synonymes variés : fautes de frappe, anomalies de saisie, écarts d'écriture, variations de graphie).
+> - **Visuels & Code snippets** : diapositives allégées en texte, cartes à fort contraste visuel, diagrammes de décision fléchés et boîtes de code style terminal sombre (`#1E293B`) avec texte clair (`#F1F5F9`).
+> - **Palette & Identité IT University** : Bleu institutionnel (`#283A97`), Vert feuille (`#76B729`), Vert citron (`#B2D235`), Arrière-plan doux (`#F8FAFC`) et boîtes sombres (`#1E293B`).
+> - **Notes orateur** : repères oraux concrets pour l'enseignant sur chaque diapositive.
 
 ---
 
@@ -16,272 +17,320 @@ Ce document définit le plan détaillé de la **Présentation 2** sur les 5 pré
 | Présentation | Titre | Statut | Périmètre principal |
 | :--- | :--- | :--- | :--- |
 | **Partie 1** | **Cadrage, Préparation locale & Connexion aux datasources** | Validé & Déployé (18 slides) | Contexte métier, prérequis machine, feuille de route, règle d'or non destructive, cartographie, génération & colonnes détaillées des 3 sources, setup local (`uv`, `.env`), connexions en lecture seule. |
-| **Partie 2** | **Exploration, Nettoyage & Règles de rapprochement** | **Document courant** (12 slides) | Diagnostic notebook, hétérogénéité des formats, fonctions pures de normalisation, tokenisation des prénoms, matrice hybride `C1`–`C4`, verrou anti-conflit CIN, fuzzy matching adaptatif et gestion des foyers. |
+| **Partie 2** | **Exploration, Nettoyage & Règles de rapprochement** | **Document courant** (15 slides) | Diagnostic notebook, hétérogénéité des formats, fonctions pures de normalisation, tokenisation des prénoms, matrice hybride `C1`–`C4`, verrou anti-conflit CIN, tolérance floue adaptative, aiguillage tripartite et ponts transitifs. |
 | **Partie 3** | **Modélisation cible & Pipeline ETL en flux** | À rédiger ultérieurement | Schéma cible `tp_assurance_etl` (sans `uid` au départ), conservation du brut + colonnes canoniques + `details_metier` JSONB, extraction streaming + `COPY`, indexation de base. |
 | **Partie 4** | **Ajout DDL `UID` & Moteur Union-Find** | À rédiger ultérieurement | Ajout de la colonne `uid`, structure `CompactUnionFind`, passes exactes `C1`–`C3`, passe floue par blocage `(date_naiss_norm, sexe_norm)`, routage vers la file humaine. |
 | **Partie 5** | **Mini-application Web, Arbitrage humain & Audit** | À rédiger ultérieurement | Interface FastAPI (tableau de bord, recherche, fiche groupe `UID`, file de validation dont `SUSPICION_FAUTE_CIN`), tests `pytest` et métriques de réconciliation. |
 
 ---
 
-## Détail des diapositives — Présentation 2 (12 slides)
+## Détail des 15 diapositives — Présentation 2
 
 ---
 
 ### Slide 1 — Page de titre : Exploration, Nettoyage & Règles de Rapprochement
 
-- **Bandeau haut** : `LICENCE INFORMATIQUE · TP DATA D.L.A`
-- **Titre** : Exploration, Nettoyage & Règles de Rapprochement
-- **Sous-titre** : Partie 2 / 5 — De la disparité des sources à la matrice d'attribution du référentiel unique (`UID`)
-- **Objectif pédagogique** : Poser le thème de la séance : transformer des données hétérogènes et bruitées en un socle canonique comparable et établir des règles d'attribution déterministes.
-
-#### Schéma conceptuel central
-```text
-[ Auto (PostgreSQL 16) ]     [ Life (MySQL 8.4) ]     [ Autre (Fichier CSV) ]
-           \                         |                         /
-            \                        |                        /
-     [ Diagnostic dans le notebook : formats, absences & erreurs de saisie ]
-                                     |
-     [ Pipeline de normalisation canonique : fonctions pures testables ]
-                                     |
-     [ Matrice hiérarchique C1–C4 + Verrou strict anti-conflit de CIN ]
-                                     v
-           [ Socle prêt pour le moteur de réconciliation UID ]
-```
-
-#### Éléments clés de cadrage
-- **Environnement de la séance** : Notebook Jupyter `notebooks/01_exploration.ipynb` et module de normalisation `src/tp_data_dla/normalisation.py`.
-- **Démarche d'ingénieur** : Observer d'abord (profilage statistique), comprendre les écarts, spécifier les fonctions pures de nettoyage, puis formaliser les critères de décision avant d'écrire l'ETL.
-- **Notes orateur** : Rappeler que dans un projet d'entreprise comme dans ce TP, aucune réconciliation ne fonctionne par un simple `JOIN` SQL direct. La phase d'observation et de normalisation conditionne l'exactitude du référentiel cible.
+- **Arrière-plan** : Bleu ITU sombre (`#283A97`).
+- **Badge supérieur** : `LICENCE INFORMATIQUE · TP DATA D.L.A` (Vert citron `#B2D235`, 10pt gras).
+- **Titre principal** : `Exploration, Nettoyage & Règles de Rapprochement` (Blanc `#FFFFFF`, 23pt gras).
+- **Sous-titre** : `Partie 2 / 5 — De la disparité des sources à la matrice d'attribution du référentiel unique (UID)` (Bleu très clair `#CADCFC`, 12pt).
+- **Badges horizontaux (Sources)** :
+  - `Auto : PostgreSQL 16 (100k)` · `Life : MySQL 8.4 (100k)` · `Autre : Fichier CSV (200k)`
+- **Logo** : IT University (variante claire avec texte blanc).
+- **Notes orateur** : Rappeler l'objectif de la séance : transformer des données hétérogènes et bruitées en un socle canonique propre et comparable, puis établir des règles de décision claires avant d'écrire le moindre code d'ingestion.
 
 ---
 
 ### Slide 2 — Feuille de route & Objectifs de l'étape 2
 
-- **Bandeau haut** : `FEUILLE DE ROUTE · PARCOURS EN 5 ÉTAPES`
-- **Titre** : Feuille de route du TP : cap sur l'étape 2
-- **Sous-titre** : Comprendre les disparités pour bâtir une matrice de décision irréprochable
-- **Objectif pédagogique** : Replacer la séance dans le déroulé global et fixer les 3 livrables concrets attendus à l'issue de cette session.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `FEUILLE DE ROUTE · PARCOURS EN 5 SÉANCES` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Feuille de route : cap sur l'étape 2` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Comprendre les disparités pour bâtir une matrice de décision irréprochable` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Diagramme séquentiel du TP
+#### Schéma séquentiel du TP (5 blocs horizontaux / verticaux)
 ```text
-[ 1. Préparation & Connexions ]  --> TERMINÉ (18 slides · Environnement & Sources prêts)
-             |
-             v
-[ 2. Exploration & Règles ]      --> SESSION COURANTE
-  ├── 2.1 Diagnostiquer : profils statistiques, formats, anomalies
-  ├── 2.2 Normaliser   : module de fonctions pures (normalisation.py)
-  └── 2.3 Formaliser   : matrice C1 à C4, tolérance floue & verrou CIN
-             |
-             v
-[ 3. Schéma Cible & ETL Flux ]   --> Prochaine étape (Partie 3)
-             |
-             v
-[ 4. Moteur Union-Find & UID ]   --> À venir (Partie 4)
-             |
-             v
-[ 5. App Web & Audit Qualité ]   --> À venir (Partie 5)
+[ Étape 1 : Préparation & Connexions ]  --> TERMINÉ (18 slides · Environnement & Sources prêts)
+                    │
+                    v
+[ Étape 2 : Exploration & Règles ]      --> SÉANCE COURANTE
+  ├── 1. Diagnostiquer : profils statistiques, formats, anomalies réelles
+  ├── 2. Normaliser   : module de fonctions pures (normalisation.py)
+  └── 3. Décider      : matrice C1 à C4, tolérance floue & verrou CIN
+                    │
+                    v
+[ Étape 3 : Schéma Cible & ETL Flux ]   --> Prochaine étape
+[ Étape 4 : Moteur Union-Find & UID ]   --> À venir
+[ Étape 5 : App Web & Audit Qualité ]   --> À venir
 ```
 
-#### Les 3 objectifs de la séance
+#### Les 3 livrables concrets de la séance
 1. **Diagnostiquer les hétérogénéités** : types SQL disparates, formats textuels, dates, diacritiques, casse et conventions par système.
 2. **Implémenter les fonctions pures de normalisation** : transformation déterministe vers des colonnes canoniques comparables.
 3. **Formaliser la matrice hiérarchique de rapprochement** : règles `C1` à `C4`, gestion des seuils flous et verrou absolu anti-conflit de CIN.
-- **Notes orateur** : Insister sur la distinction : aujourd'hui, on ne charge pas encore la base cible définitive et on n'assigne pas encore les `UID`. On analyse, on nettoie et on formalise les règles du jeu.
+- **Notes orateur** : Aujourd'hui, on ne charge pas encore la base cible définitive et on n'assigne pas encore les `UID`. On observe, on nettoie et on formalise les critères de décision.
 
 ---
 
-### Slide 3 — Le choc des formats : comparaison des fiches brutes
+### Slide 3 — Le choc des formats réels : un même individu, 3 fiches incompatibles
 
-- **Bandeau haut** : `DIAGNOSTIC DES SOURCES · HÉTÉROGÉNÉITÉ TECHNIQUE`
-- **Titre** : Le choc des formats : comparaison des fiches brutes
-- **Sous-titre** : Pourquoi aucun simple `JOIN` SQL direct n'est possible
-- **Objectif pédagogique** : Visualiser l'extrême hétérogénéité technique entre les trois silos sur une même personne physique.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `DIAGNOSTIC DES SOURCES · DISPARITÉ TECHNIQUE` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Le choc des formats : un même individu, trois visions` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Exemple réel d'une même personne enregistrée dans nos trois bases` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Tableau comparatif concret (exemple réel d'un même individu)
+#### Tableau comparatif concret (Carte centrale blanche `#FFFFFF` bordée de `#E2E8F0`)
 
 | Attribut | Auto (PostgreSQL 16) | Life (MySQL 8.4) | Autre (Fichier CSV) | Diagnostic immédiat |
 | :--- | :--- | :--- | :--- | :--- |
 | **Identifiant local** | `id_client_auto` = `1004521` | `ref_adherent` = `3004521` | `ref_fiche` = `'EXT-5004521'` | Espaces de clés totalement disjoints |
-| **Pièce d'identité** | `numero_cin` = `'CIN- 800005316023'` | `cin_numerique` = `800005316023` | `piece_identite` = `'800005316023'` | Préfixe textuel vs nombre entier vs chaîne |
+| **Pièce d'identité** | `numero_cin` = `'CIN- 800005316023'` | `cin_numerique` = `800005316023` | `piece_identite` = `'800005316023'` | Préfixe texte vs entier `BIGINT` vs chaîne |
 | **Nom de famille** | `nom_assure` = `' Ramanitra '` | `nom_adherent` = `'RAMANITRA'` | `patronyme` = `'Ramanitra'` | Espaces parasites, casse mixte |
 | **Prénoms** | `prenoms_assure` = `'Faly Tahina'` | `prenoms_adherent` = `'FALY-TAHINA'` | `autres_noms` = `'Tahina Faly'` | Tirets, casse et inversion de l'ordre |
-| **Date de naissance** | `ne_le` = `'1970-04-19'` (`DATE`) | `date_naiss` = `19700419` (`INT`) | `date_naissance` = `'19-04-1970'` (`TEXT`) | Date SQL vs Entier `YYYYMMDD` vs Texte français |
-| **Téléphone** | `mobile` = `'00 95 397 11'` | `tel_contact` = `'+000009539711'` | `contact_tel` = `'00-95-397-11'` | Préfixe international fictif, tirets, espaces |
-| **Sexe / Genre** | `sexe` = `'Masculin'` | `genre` = `1` | `code_sexe` = `'M'` | Libellé texte vs code binaire (`0/1`) vs code lettre |
+| **Date naissance** | `ne_le` = `'1970-04-19'` (`DATE`) | `date_naiss` = `19700419` (`INT`) | `date_naissance` = `'19-04-1970'` (`TEXT`) | Date SQL vs Entier compact vs Format français |
+| **Téléphone** | `mobile` = `'00 95 397 11'` | `tel_contact` = `'+000009539711'` | `contact_tel` = `'00-95-397-11'` | Indicatif international, tirets, espaces |
+| **Sexe / Genre** | `sexe` = `'Masculin'` | `genre` = `1` | `code_sexe` = `'M'` | Libellé texte vs code binaire (`0/1`) vs lettre |
 
-#### Échec de la jointure directe (Boîte Terminal sombre `#1E293B`)
-```sql
--- Tentative de jointure directe : résultat = 0 correspondance !
-SELECT a.nom_assure, l.nom_adherent 
-FROM tp_assurance.clients_auto a
-JOIN tp_assurance_life.clients_life l 
-  ON a.numero_cin = l.cin_numerique; -- Types incompatibles (TEXT vs BIGINT)
-```
-- **Notes orateur** : Montrer que même sur un attribut standardisé comme la date de naissance, on a 3 représentations incompatibles (`DATE`, `INT`, `TEXT`). Une phase de transformation intermédiaire est obligatoire.
+- **Notes orateur** : Faire remarquer aux étudiants qu'aucune colonne n'est immédiatement comparable à l'état brut. Même la date de naissance est stockée sous 3 types physiques complètement différents.
 
 ---
 
-### Slide 4 — Diagnostic des anomalies : les 4 familles de bruit du monde réel
+### Slide 4 — Pourquoi la jointure SQL directe échoue lamentablement
 
-- **Bandeau haut** : `DIAGNOSTIC DES SOURCES · BRUIT & ANOMALIES`
-- **Titre** : Les 4 familles d'anomalies identifiées dans les sources
-- **Sous-titre** : Pourquoi un nettoyage purement syntaxique ne suffit pas
-- **Objectif pédagogique** : Comprendre la nature des bruits rencontrés en production (casse, diacritiques, manques, fautes de saisie et pièges relationnels).
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `DIAGNOSTIC TECHNIQUE · ÉCHEC DU JOIN CLASSIQUE` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Pourquoi un simple JOIN SQL direct est impossible` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Deux requêtes naïves et leurs conséquences immédiates` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Schéma en 4 cartes d'anomalies
+#### 2 colonnes comparatives
+- **Colonne gauche : Boîte Terminal sombre `#1E293B` (Code SQL naïf)** :
+```sql
+-- Tentative 1 : Jointure directe sur le CIN
+SELECT a.nom_assure, l.nom_adherent 
+FROM tp_assurance.clients_auto a
+JOIN tp_assurance_life.clients_life l 
+  ON a.numero_cin = l.cin_numerique;
+-- ERREUR : Incompatibilité de types (TEXT vs BIGINT) !
+
+-- Tentative 2 : Jointure sur Nom et Date
+SELECT a.id_client_auto, l.ref_adherent
+FROM tp_assurance.clients_auto a
+JOIN tp_assurance_life.clients_life l
+  ON a.nom_assure = l.nom_adherent
+ AND a.ne_le::text = l.date_naiss::text;
+-- RÉSULTAT : 0 correspondance trouvée !
+```
+
+- **Colonne droite : Carte d'analyse des blocages (`#FFFFFF`)** :
+  - **1. Rupture de types physiques** : Un moteur SQL refuse d'office de joindre une chaîne formatée `'CIN- ...'` avec un entier numérique.
+  - **2. Bruit invisible** : Les espaces de début/fin (`' Ramanitra '`) et la sensibilité à la casse font échouer l'égalité stricte `=`.
+  - **3. Formats de date non alignés** : `'1970-04-19'` ne correspondra jamais à `'19700419'`.
+  - **Conclusion** : Un pipeline de transformation canonique en amont est indispensable avant tout rapprochement.
+- **Notes orateur** : Souligner que l'échec de la jointure directe est typique des systèmes d'information d'entreprise historiques bâtis en silos indépendants.
+
+---
+
+### Slide 5 — Les 4 familles d'anomalies de saisie du monde réel
+
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `QUALITÉ DES DONNÉES · BIAIS DE SAISIE HUMAINE` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Les 4 familles d'anomalies identifiées dans les sources` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Environ 5 % de bruit réaliste simulant les habitudes des agents de saisie` (Gris ardoise `#64748B`, 10.5pt).
+
+#### 4 cartes visuelles équilibrées (Grille 2x2 avec fonds thématiques clairs)
 
 ```text
 ┌────────────────────────────────────────┐   ┌────────────────────────────────────────┐
-│ 1. Écarts d'écriture & Casse           │   │ 2. Inversion & Séparateurs de prénoms  │
-│ • Espaces multiples et trim            │   │ • Tirets vs espaces : 'FALY-TAHINA'    │
-│ • Minuscules / Majuscules désordonnées │   │ • Ordre inversé : 'TAHINA FALY'        │
-│ • Accents et diacritiques (é/e, etc.)  │   │ • Prénoms multiples asymétriques       │
+│ 🔤 1. Écarts d'écriture & Casse        │   │ 🔄 2. Variations sur les prénoms       │
+│ • Espaces multiples et superflus       │   │ • Séparateurs variés : '-' vs espace   │
+│ • Minuscules / Majuscules disparates   │   │ • Ordre inversé : 'TAHINA FALY'        │
+│ • Accents et caractères diacritiques   │   │ • Prénoms composés tronqués            │
+│   Ex : 'Ramanitra ' vs 'RAMANITRA'     │   │   Ex : 'Faly-Tahina' vs 'Tahina Faly'  │
 └────────────────────────────────────────┘   └────────────────────────────────────────┘
                     ▲                                            ▲
                     │                                            │
 ┌────────────────────────────────────────┐   ┌────────────────────────────────────────┐
-│ 3. Attributs absents (NULL / Vides)    │   │ 4. Fautes de frappe réalistes (~5 %)   │
-│ • ~3 % à 5 % de lieux manquants        │   │ • Lettre substituée ou doublée         │
-│ • Téléphone ou e-mail non renseigné    │   │ • Transposition de 2 lettres           │
-│ • CIN manquant sur certains dossiers   │   │ • 1 chiffre erroné sur CIN/téléphone   │
+│ ⌨️ 3. Fautes de frappe réalistes (~5%) │   │ ⭕ 4. Valeurs manquantes (NULL)        │
+│ • Lettre substituée ou doublée         │   │ • ~3 % à 5 % de communes absentes      │
+│ • Permutation de deux lettres voisines │   │ • Téléphone ou adresse mail omis       │
+│ • Un chiffre erroné sur CIN/téléphone  │   │ • Pièce d'identité en attente (NULL)   │
+│   Ex : 'RAKOTOO' ou '800000000083'     │   │   Ex : 'Lieu de naissance : NULL'      │
 └────────────────────────────────────────┘   └────────────────────────────────────────┘
 ```
-
-#### Deux pièges relationnels majeurs à retenir
-- **Homonymes parfaits** : Deux personnes physiques distinctes partageant le même nom, les mêmes prénoms et la même date de naissance, mais avec deux CIN différents.
-- **Membres d'un même foyer** : Deux personnes physiques distinctes (ex. conjoints) partageant le même numéro de téléphone ou la même adresse de courriel.
-- **Notes orateur** : Souligner l'importance des deux pièges : si un algorithme regroupe des personnes uniquement parce qu'elles ont le même téléphone ou la même date de naissance, il commet une faute métier grave en mélangeant les contrats d'un couple ou d'homonymes.
+- **Notes orateur** : Préciser que ces erreurs ne sont pas des bugs de notre générateur mais une reproduction fidèle des données réelles d'assurance où plusieurs personnes saisissent sur des formulaires différents au fil des décennies.
 
 ---
 
-### Slide 5 — Le pipeline de normalisation canonique (Fonctions pures)
+### Slide 6 — Deux pièges relationnels majeurs : Homonymes & Foyers
 
-- **Bandeau haut** : `NORMALISATION · FONCTIONS PURES DÉTERMINISTES`
-- **Titre** : Pipeline de normalisation canonique
-- **Sous-titre** : Des fonctions pures, déterministes et sans effet de bord (`normalisation.py`)
-- **Objectif pédagogique** : Structurer la couche de nettoyage sous forme d'une suite de fonctions unitaires testables produisant des colonnes canoniques.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `PIÈGES MÉTIER · ÉVITER LES AMALGAMMES` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Deux pièges relationnels : Homonymes et Foyers` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Pourquoi un algorithme naïf commet des fusions illégitimes catastrophiques` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Disposition en deux colonnes : Principe (Gauche) & Extrait de code (Droite)
-- **Colonne gauche (Tableau des transformations canoniques)** :
-  - `'CIN- 800005316023'` $\rightarrow$ `normaliser_cin()` $\rightarrow$ `'800005316023'` (`CHAR(12)`)
-  - `'  Ramanitra  '` $\rightarrow$ `normaliser_nom()` $\rightarrow$ `'RAMANITRA'` (Majuscule, sans accent)
-  - `'Faly-Tahina'` $\rightarrow$ `normaliser_prenoms()` $\rightarrow$ `'FALY TAHINA'` (Tokens triés)
-  - `'19700419'` (`INT`) $\rightarrow$ `normaliser_date()` $\rightarrow$ `'1970-04-19'` (`DATE` ISO)
-  - `'+000009539711'` $\rightarrow$ `normaliser_tel()` $\rightarrow$ `'009539711'` (9 chiffres `00XXXXXXX`)
-  - `'Contact@Mail.MG'` $\rightarrow$ `normaliser_mail()` $\rightarrow$ `'contact@mail.mg'` (Minuscules)
-  - `1` ou `'Masculin'` $\rightarrow$ `normaliser_sexe()` $\rightarrow$ `'M'` (`'M'` ou `'F'`)
+#### 2 cartes contrastées (Danger / Avertissement)
+- **Carte 1 : 👥 Le piège des homonymes (Rouge doux `#FEF2F2`, bordure rouge)** :
+  - **Cas concret** : Deux individus distincts s'appellent « Jean RAKOTO », sont nés le même jour dans la même ville, mais ont deux numéros CIN officiels distincts.
+  - **Risque d'un algorithme naïf** : Les regrouper sous un seul UID sur la base de l'état civil.
+  - **Conséquence métier** : Fusion illégitime de contrats d'assurance, violation de la confidentialité des données personnelles.
+- **Carte 2 : 🏠 Le piège du foyer familial (Jaune doux `#FEF3C7`, bordure ambre)** :
+  - **Cas concret** : Deux conjoints ou un parent et son enfant partagent la même ligne fixe, le même mobile de contact ou la même boîte courriel.
+  - **Risque d'un algorithme naïf** : Conclure qu'un même numéro de téléphone équivaut à un seul individu.
+  - **Conséquence métier** : Amalgamation de deux personnes distinctes en une seule fiche client.
+- **Notes orateur** : Insister sur ces deux pièges : un bon système de réconciliation ne doit pas seulement rapprocher ce qui se ressemble, il doit avant tout savoir ce qu'il est formellement interdit de fusionner !
 
-- **Colonne droite (Boîte Terminal sombre `#1E293B`)** :
+---
+
+### Slide 7 — Le pipeline de normalisation canonique
+
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `NORMALISATION CANONIQUE · ARCHITECTURE` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Le pipeline de normalisation : principe des fonctions pures` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Des transformations déterministes, sans effet de bord et testables unitairement` (Gris ardoise `#64748B`, 10.5pt).
+
+#### Schéma en entonnoir de normalisation
+```text
+[ Donnée source brute ]  ──> [ Fonction pure de nettoyage ] ──> [ Attribut canonique normalisé ]
+'CIN- 800005316023'     ──>       normaliser_cin()         ──> '800005316023' (12 chiffres)
+'  Ramanitra  '         ──>       normaliser_nom()         ──> 'RAMANITRA' (sans accent)
+'Faly-Tahina'           ──>     normaliser_prenoms()       ──> 'FALY TAHINA' (tokens triés)
+'19700419' (INT)        ──>       normaliser_date()        ──> '1970-04-19' (ISO DATE)
+'+000009539711'         ──>       normaliser_tel()         ──> '009539711' (9 chiffres)
+'Contact@Mail.MG'       ──>       normaliser_mail()        ──> 'contact@mail.mg' (minuscules)
+1 ou 'Masculin'         ──>       normaliser_sexe()        ──> 'M' ('M' ou 'F')
+```
+
+#### Règle d'or appliquée à l'architecture
+- **La donnée brute n'est jamais écrasée ni effacée**.
+- Dans la table consolidée, chaque enregistrement conserve sa colonne brute d'origine ET dispose d'une colonne canonique normalisée (`nom_norm`, `cin_norm`, etc.).
+- Les fonctions de nettoyage sont pures : pour une même entrée, elles retournent toujours exactement la même sortie, sans modifier d'état global.
+- **Notes orateur** : Ce découpage permet de tester chaque fonction unitairement dans `tests/test_normalisation.py` avant de la brancher sur des centaines de milliers de lignes.
+
+---
+
+### Slide 8 — Implémentation : les fonctions de nettoyage essentielles
+
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `CODE SOURCE · MODULE NORMALISATION.PY` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Implémentation : extraits de normalisation.py` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Robustesse face aux formats exotiques et types inattendus` (Gris ardoise `#64748B`, 10.5pt).
+
+#### Boîte Terminal sombre `#1E293B` (Snippets Python réels du projet)
 ```python
 # src/tp_data_dla/normalisation.py
 def normaliser_nom(valeur: Any) -> Optional[str]:
-    """Nettoie le patronyme : trim, sans accents, majuscules."""
+    """Nettoie le patronyme : trim, suppression accents, majuscules."""
     if not valeur:
         return None
     texte = supprimer_accents(str(valeur)).strip().upper()
     return RE_ESPACES.sub(" ", texte) or None
 
 def normaliser_cin(valeur: Any) -> Optional[str]:
-    """Extrait un CIN canonique sur 12 chiffres consécutifs."""
+    """Extrait une chaîne de 12 chiffres consécutifs sans préfixe."""
     if valeur is None:
         return None
-    chiffres = RE_CHIFRES.sub("", str(valeur))
+    chiffres = RE_CHIFFRES.sub("", str(valeur))
     return chiffres if len(chiffres) == 12 else None
+
+def normaliser_date(valeur: Any) -> Optional[str]:
+    """Convertit INT numérique (19850412), date ou texte vers YYYY-MM-DD."""
+    if not valeur:
+        return None
+    # Gère le piège MySQL (INT 19850412) et formats texte français
+    return parse_date_universelle(valeur)
 ```
-- **Notes orateur** : Expliquer pourquoi nous conservons toujours la donnée brute dans la base cible et que nous ajoutons ces colonnes canoniques à côté. Cela respecte rigoureusement notre règle d'or non destructive.
+
+#### Carte explicative latérale (`#FFFFFF`)
+- Gestion défensive du type `Any` : accepte aussi bien un entier qu'une chaîne ou une instance `datetime`.
+- Les expressions régulières (`re.compile`) sont précompilées au chargement du module pour garantir une vitesse d'exécution optimale.
+- Validation immédiate via la suite de tests : `uv run pytest tests/test_normalisation.py`.
+- **Notes orateur** : Montrer que chaque fonction gère le cas des valeurs absentes (`None`) dès la première ligne pour éviter toute exception en milieu de flux ETL.
 
 ---
 
-### Slide 6 — Focus : la tokenisation et le tri des prénoms
+### Slide 9 — Le traitement des prénoms : tokenisation et tri alphabétique
 
-- **Bandeau haut** : `NORMALISATION · GESTION DES PRÉNOMS COMPOSÉS`
-- **Titre** : Le cas des prénoms : tokenisation et tri alphabétique
-- **Sous-titre** : Comment absorber toutes les inversions d'ordre sans perte d'information
-- **Objectif pédagogique** : Comprendre le fonctionnement de l'attribut `prenoms_trie_norm` pour réconcilier les variations d'ordre des prénoms composés.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `NORMALISATION AVANCÉE · PRÉNOMS COMPOSÉS` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Prénoms composés : tokenisation et tri alphabétique` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Comment absorber les variations d'ordre sans aucune perte d'information` (Gris ardoise `#64748B`, 10.5pt).
 
 #### Schéma du mécanisme de tokenisation
-
 ```text
-       Source Auto (PostgreSQL)               Source Life (MySQL)                 Source Autre (CSV)
-            'Faly Tahina'                        'FALY-TAHINA'                       'Tahina Faly'
-                  │                                    │                                   │
-                  ▼                                    ▼                                   ▼
-          Nettoyage accents                    Remplacement '-'                    Nettoyage accents
-           + Majuscules                           par espace                          + Majuscules
-                  │                                    │                                   │
-                  ▼                                    ▼                                   ▼
-        Tokens : ['FALY', 'TAHINA']          Tokens : ['FALY', 'TAHINA']         Tokens : ['TAHINA', 'FALY']
-                  │                                    │                                   │
-                  └──────────────────┬─────────────────┴───────────────────┘
-                                     ▼
-                          Tri alphabétique des tokens
-                                     │
-                                     ▼
-                     Forme canonique : 'FALY TAHINA'
+   Source Auto (PostgreSQL)            Source Life (MySQL)               Source Autre (CSV)
+        'Faly Tahina'                     'FALY-TAHINA'                     'Tahina Faly'
+              │                                 │                                 │
+              ▼                                 ▼                                 ▼
+      Nettoyage accents                 Remplacement '-'                  Nettoyage accents
+       + Majuscules                        par espace                        + Majuscules
+              │                                 │                                 │
+              ▼                                 ▼                                 ▼
+    Tokens : ['FALY', 'TAHINA']       Tokens : ['FALY', 'TAHINA']       Tokens : ['TAHINA', 'FALY']
+              │                                 │                                 │
+              └────────────────┬────────────────┴─────────────────────────────────┘
+                               ▼
+                    Tri alphabétique des tokens
+                               │
+                               ▼
+               Forme pivot canonique : 'FALY TAHINA'
 ```
 
 #### Boîte de code (Terminal sombre `#1E293B`)
 ```python
-# Découpage en tokens et tri alphabétique
-tokens = [t for t in RE_ESPACES.split(texte) if t]
-prenoms_norm = " ".join(tokens)             # 'TAHINA FALY' (ordre conservé)
-prenoms_trie_norm = " ".join(sorted(tokens)) # 'FALY TAHINA' (forme pivot)
+# Extraction des tokens et tri alphabétique
+tokens = [t for t in RE_ESPACES.split(texte_nettoye) if t]
+prenoms_norm = " ".join(tokens)              # 'TAHINA FALY' (ordre d'origine)
+prenoms_trie_norm = " ".join(sorted(tokens))  # 'FALY TAHINA' (forme pivot commune)
 ```
-- **Notes orateur** : Signaler aux étudiants que cette règle simple résout à elle seule un très grand nombre de faux négatifs constatés dans les bases malgaches où l'ordre des prénoms varie fréquemment selon les agences ou habitudes de saisie.
+- **Notes orateur** : Souligner que cette règle simple résout à elle seule la très grande majorité des faux négatifs observés sur les prénoms composés malgaches où l'ordre de saisie varie selon les agences.
 
 ---
 
-### Slide 7 — La matrice de rapprochement hiérarchique (C1 à C4)
+### Slide 10 — La matrice hiérarchique de rapprochement (C1 à C4)
 
-- **Bandeau haut** : `MOTEUR DE RÉCONCILIATION · MATRICE HIÉRARCHIQUE`
-- **Titre** : La matrice hiérarchique de rapprochement
-- **Sous-titre** : 4 niveaux de règles ordonnées par degré de certitude
-- **Objectif pédagogique** : Présenter la matrice de décision régissant l'attribution automatique ou l'arbitrage humain.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `MOTEUR DE RÉCONCILIATION · MATRICE HIÉRARCHIQUE` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `La matrice hiérarchique de rapprochement` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Quatre niveaux de règles ordonnées par degré de certitude décroissant` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Pyramide de décision
+#### Pyramide de décision des règles
 
 ```text
-  [ Règle C1 : CIN Identique (Certitude maximale) ]
-  ├── cin_norm_a = cin_norm_b (valide et non NULL)
-  └── Attribution automatique immédiate du même UID
-        │ (si non concluant)
+  [ Règle C1 : Numéro CIN identique (Certitude absolue) ]
+  ├── cin_norm valide, complet (12 chiffres) et identique sur les deux fiches
+  └── Décision : Attribution automatique immédiate du même UID (Motif: PIVOT_CIN)
+        │ (si non concluant / CIN manquant)
         ▼
-  [ Règle C2 : État Civil Complet + Ville (Forte confiance) ]
+  [ Règle C2 : État civil complet avec Commune (Très forte confiance) ]
   ├── nom_norm + prenoms_trie_norm + date_naiss_norm + lieu_naiss_norm + ville_norm
-  └── Attribution automatique sous contrôle du verrou CIN
+  └── Décision : Attribution automatique sous contrôle du verrou CIN
+        │ (si non concluant / commune différente)
+        ▼
+  [ Règle C3 : État civil sans la Commune (Absorbe les déménagements) ]
+  ├── nom_norm + prenoms_trie_norm + date_naiss_norm + lieu_naiss_norm
+  └── Décision : Attribution automatique sous contrôle du verrou CIN
         │ (si non concluant)
         ▼
-  [ Règle C3 : État Civil sans Ville (Confiance modérée) ]
-  ├── nom_norm + prenoms_trie_norm + date_naiss_norm + lieu_naiss_norm (absorbe déménagement)
-  └── Attribution automatique sous contrôle du verrou CIN
-        │ (si non concluant)
-        ▼
-  [ Règle C4 : Coordonnées de Contact seules (Ambiguïté Foyer) ]
-  ├── C4a (Identité + Tel) / C4b (Identité + Mail)
-  └── ATTRIBUTION AUTOMATIQUE INTERDITE --> File de validation humaine
+  [ Règle C4 : Coordonnées de contact seules (Ambiguïté foyer) ]
+  ├── C4a (Identité + Téléphone) ou C4b (Identité + E-mail)
+  └── Décision : ATTRIBUTION AUTOMATIQUE INTERDITE ──> File d'arbitrage humain
 ```
 
-#### Tableau de synthèse des actions du moteur
-
-| Règle | Critères obligatoires | Degré de certitude | Décision moteur | Motif traçabilité |
-| :---: | :--- | :---: | :--- | :--- |
-| **C1** | `cin_norm` identique et non nul | **Certitude absolue** | Attribution automatique du même `UID` | `PIVOT_CIN` |
-| **C2** | Nom + Prénoms triés + Date naissance + Lieu + Ville | **Très élevé** | Attribution automatique si pas de conflit CIN | `ETAT_CIVIL_EXACT_VILLE` |
-| **C3** | Nom + Prénoms triés + Date naissance + Lieu | **Élevé** | Attribution automatique si pas de conflit CIN | `ETAT_CIVIL_EXACT_DEMENAGEMENT` |
-| **C4a / C4b** | Identité concordante + Téléphone OU E-mail | **Ambigu (foyer)** | **File humaine obligatoire** (suspicion foyer) | `SUSPICION_FOYER` |
-
-- **Notes orateur** : Souligner la hiérarchie : on commence toujours par le critère le plus certain (`C1`). Ce n'est qu'en l'absence de CIN qu'on fait appel à l'état civil (`C2`, `C3`).
+#### Synthèse des règles
+- On commence toujours par le critère le plus certain (`C1`).
+- Ce n'est qu'en l'absence de CIN qu'on fait appel à l'état civil (`C2`, `C3`).
+- **Notes orateur** : Expliquer que la règle `C4` ne doit jamais fusionner automatiquement des dossiers pour ne pas créer d'amalgames entre conjoints ou collègues.
 
 ---
 
-### Slide 8 — Le verrou absolu anti-conflit de CIN
+### Slide 11 — Le verrou absolu anti-conflit de CIN
 
-- **Bandeau haut** : `INTÉGRITÉ ALGORITHMIQUE · SÉCURITÉ ABSOLUE`
-- **Titre** : Le verrou algorithmique anti-conflit de CIN
-- **Sous-titre** : Interdiction formelle de relier deux fiches aux CIN distincts
-- **Objectif pédagogique** : Comprendre le rôle du verrou algorithmique pour empêcher la fusion d'homonymes parfaits.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `SÉCURITÉ ALGORITHMIQUE · VERROU INFRANGIBLE` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Le verrou algorithmique anti-conflit de CIN` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Interdiction formelle de relier deux fiches ayant deux CIN distincts` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Schéma logique du verrou anti-conflit
+#### Diagramme de flux décisionnel du verrou
 
 ```text
                    Tentative de rapprochement par C2 ou C3
@@ -305,72 +354,58 @@ prenoms_trie_norm = " ".join(sorted(tokens)) # 'FALY TAHINA' (forme pivot)
                                                         Envoi en CONFLIT_CIN
 ```
 
-#### Étude de cas : le piège des homonymes
+#### Étude de cas : la protection des homonymes
 - **Fiche A (Auto)** : `'ANDRIANINA Mamy'`, né le `1985-06-12` à Antananarivo, CIN = `'101234567890'`
 - **Fiche B (Life)** : `'ANDRIANINA Mamy'`, né le `1985-06-12` à Antananarivo, CIN = `'201987654321'`
-- **Sans le verrou** : `C2` regroupe les deux fiches sous un même `UID` car l'état civil est rigoureusement identique. **Erreur métier catastrophique**.
-- **Avec le verrou** : Le moteur détecte deux CIN valides différents, bloque la réunion, trace l'anomalie et préserve l'indépendance des deux personnes.
-- **Notes orateur** : Insister fortement sur ce concept : un CIN valide est la vérité juridique absolue d'une personne physique à Madagascar. Deux CIN distincts = deux individus distincts, quel que soit leur degré de ressemblance d'état civil.
+- **Sans le verrou** : `C2` regroupe les deux fiches sous un même `UID`. **Faute métier grave**.
+- **Avec le verrou** : Le moteur détecte deux numéros CIN valides différents, bloque l'union et consigne l'alerte `CONFLIT_CIN`.
+- **Notes orateur** : À Madagascar, la carte d'identité nationale est la vérité d'état civil officielle. Deux CIN valides différents garantissent qu'il s'agit de deux personnes physiques différentes, peu importe leur nom.
 
 ---
 
-### Slide 9 — Tolérance aux erreurs de frappe : Fuzzy Matching adaptatif
+### Slide 12 — Rapprochement flou adaptatif : attraper les fautes de frappe
 
-- **Bandeau haut** : `ALGORITHMIQUE · RAPPROCHEMENT FLOU`
-- **Titre** : Rapprochement flou adaptatif (Damerau-Levenshtein)
-- **Sous-titre** : Pourquoi le texte tolère la distance 2 mais les nombres exigent la distance 1
-- **Objectif pédagogique** : Définir la distance de Damerau-Levenshtein adaptée à la longueur des chaînes et formaliser la règle d'or sur les attributs numériques.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `ALGORITHMIQUE · RAPPROCHEMENT FLOU` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Rapprochement flou adaptatif : l'intuition concrète` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Comment rattraper les fautes de frappe sans provoquer d'amalgames` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Schéma des seuils de tolérance selon la nature de la donnée
+#### L'intuition concrète de la distance textuelle
+- **Mesure de ressemblance (Damerau-Levenshtein)** : On compte le nombre minimal d'opérations d'édition (insertion, suppression, substitution ou inversion de 2 lettres adjacentes) pour passer d'un mot à l'autre.
+- **Règle adaptative selon la longueur du mot** :
+  - **Mots courts (< 9 lettres)** : Seuil toléré = **1 opération maximum**.
+    - Exemple : `'HERY'` $\leftrightarrow$ `'HERI'` (1 lettre substituée $\rightarrow$ accepté).
+    - Rejeté : `'HERY'` $\leftrightarrow$ `'FALY'` (2 lettres différentes $\rightarrow$ rejeté !).
+  - **Mots longs ($\ge$ 9 lettres)** : Seuil toléré = **2 opérations maximum**.
+    - Exemple : `'ANDRIAMAHERY'` $\leftrightarrow$ `'ANDRIAMAHARI'` (2 lettres d'écart sur mot long $\rightarrow$ accepté).
 
-```text
-  [ Textes alphabétiques (Nom, Prénoms) ]
-  ├── Mots courts (< 9 caractères) : Distance max = 1
-  │   └── Autorisé : 'HERY' <-> 'HERI' | Rejeté : 'HERY' <-> 'FALY' (distance 2 sur mot court)
-  └── Mots longs (>= 9 caractères) : Distance max = 2
-      └── Autorisé : 'ANDRIAMAHERY' <-> 'ANDRIAMAHARI' (distance 2 sur patronyme long)
-
-  [ Nombres canoniques (CIN, Téléphone) ]
-  ├── Règle absolue : Seuil max = 1 chiffre d'écart (JAMAIS >= 2)
-  └── Pourquoi ? Les séries numériques consécutives génèrent des voisins à distance 2 :
-      Exemple : '800000000083' vs '800000000010' (2 chiffres d'écart mais 2 personnes distinctes !)
-```
-
-#### Boîte de code (Terminal sombre `#1E293B`)
-```python
-# Distance de Damerau-Levenshtein adaptative (RapidFuzz)
-min_len = min(len(s1), len(s2))
-seuil_max = 2 if min_len >= 9 else 1
-
-if abs(len(s1) - len(s2)) > seuil_max:
-    return False # Écart de longueur excessif
-
-dist = DamerauLevenshtein.distance(s1, s2, score_cutoff=seuil_max)
-return dist <= seuil_max
-```
-- **Notes orateur** : Faire comprendre pourquoi autoriser une distance de 2 ou 3 sur les numéros de CIN provoquerait l'effondrement du graphe d'identités : des milliers d'inconnus se retrouveraient fusionnés ensemble.
+#### Règle d'or sur les attributs numériques (CIN & Téléphone)
+- **Tolérance maximale = 1 seul chiffre d'écart** (jamais $\ge$ 2).
+- **Pourquoi ?** Deux séries de chiffres consécutifs diffèrent de 2 chiffres mais désignent deux personnes réelles totalement différentes (`800000000083` vs `800000000010`).
+- Tout écart d'un chiffre sur un CIN fait l'objet d'un contrôle humain sous le statut `SUSPICION_FAUTE_CIN`.
+- **Notes orateur** : Expliquer que fixer un seuil trop laxiste sur les nombres provoquerait une catastrophe d'avalanche : des milliers d'inconnus se retrouveraient regroupés sous le même UID.
 
 ---
 
-### Slide 10 — L'arbitrage : décision automatique vs file humaine
+### Slide 13 — Routage métier : Automatique vs File de validation humaine
 
-- **Bandeau haut** : `ARBITRAGE MÉTIER · ROUTAGE DES DÉCISIONS`
-- **Titre** : L'arbitrage : décision automatique vs file humaine
-- **Sous-titre** : Savoir quand le moteur tranche seul et quand il sollicite l'opérateur
-- **Objectif pédagogique** : Maîtriser le routage tripartite du moteur : attribution automatique, validation humaine guidée ou maintien séparé.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `ARBITRAGE MÉTIER · ROUTAGE À 3 VOIES` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Routage des décisions : automatique vs arbitrage humain` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Quand le système tranche-t-il seul et quand passe-t-il la main au gestionnaire ?` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Diagramme de routage des décisions
+#### Schéma d'aiguillage tripartite
 
 ```text
                            Candidat au rapprochement
                                        │
             ┌──────────────────────────┼──────────────────────────┐
             ▼                          ▼                          ▼
-  [ Branche Automatique ]    [ File de Validation ]      [ Branche Maintien / Rejet ]
-  • C1 : CIN identique       • C4a / C4b (Foyers)        • CONFLIT_CIN (>= 2 chiffres)
-  • C2 : État civil complet  • SUSPICION_FAUTE_CIN       • Incohérence majeure
-  • C3 : Sans ville            (État civil concordant    • Homonymes avérés
-  • C2/C3 Flou conforme        mais 1 chiffre d'écart)
+  [ Voie Automatique (Verte) ] [ File de Validation (Ambre) ] [ Voie Maintien (Rouge) ]
+  • C1 : CIN identique         • C4a / C4b (Suspicion Foyer)  • CONFLIT_CIN (>= 2 chiffres)
+  • C2 : État civil complet    • SUSPICION_FAUTE_CIN          • Incohérence majeure
+  • C3 : Sans commune            (Même état civil mais        • Homonymes confirmés
+  • C2/C3 Flou conforme           1 chiffre d'écart sur CIN)
             │                          │                          │
             ▼                          ▼                          ▼
       Attribution UID            Écran Arbitrage            Maintien fiches
@@ -378,23 +413,22 @@ return dist <= seuil_max
 ```
 
 #### Les deux motifs isolés pour la validation humaine
-1. **`SUSPICION_FOYER`** : Fiches partageant le même téléphone ou e-mail mais dont l'état civil n'est pas strictement identique (évite d'amalgamer les conjoints).
-2. **`SUSPICION_FAUTE_CIN`** : Même état civil exact, mais un CIN diffère d'exactement 1 chiffre (faute de frappe probable de l'agent de saisie nécessitant vérification sur pièce justificative).
-- **Notes orateur** : Présenter la file humaine comme une force du système et non une faiblesse : un bon système de réconciliation sait précisément délimiter ses certitudes et alerter un opérateur sur les cas ambigus plutôt que d'altérer la base.
+1. **`SUSPICION_FOYER`** : Fiches partageant le même téléphone ou e-mail sans état civil identique (évite d'amalgamer les conjoints).
+2. **`SUSPICION_FAUTE_CIN`** : Même état civil exact, mais un CIN diffère d'un chiffre (faute de frappe probable nécessitant un contrôle visuel sur document officiel).
+- **Notes orateur** : Présenter la file humaine comme une force du système : savoir solliciter un opérateur sur les cas ambigus plutôt que d'altérer la base est la marque d'un système robuste.
 
 ---
 
-### Slide 11 — Cas complexes : les 3 317 « ponts » de la cohorte commune
+### Slide 14 — Cas complexes : le pont transitif de la cohorte commune
 
-- **Bandeau haut** : `CAS COMPLEXES · TRANSITIVITÉ MULTI-SOURCES`
-- **Titre** : Cas complexes : les 3 317 « ponts » de la cohorte commune
-- **Sous-titre** : Comment relier deux dossiers sans attribut partagé direct
-- **Objectif pédagogique** : Visualiser la résolution des cas sans intersection directe grâce aux fiches pivots et à la transitivité des regroupements.
+- **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
+- **Badge supérieur** : `CAS COMPLEXES · TRANSITIVITÉ MULTI-SOURCES` (Vert `#2EA853`, 10pt gras).
+- **Titre** : `Cas complexes : les 331 ponts de la cohorte commune` (Bleu nuit `#1E293B`, 19pt gras).
+- **Sous-titre** : `Comment relier deux fiches ne partageant aucun attribut direct` (Gris ardoise `#64748B`, 10.5pt).
 
-#### Schéma du pont transitif entre les 3 sources
-
+#### Schéma du pont transitif entre les trois dossiers
 ```text
-  [ Dossier Auto ]                 [ Dossier Life ]                 [ Dossier Autre ]
+  [ Fiche Auto ]                   [ Fiche Life ]                   [ Fiche Autre ]
   • CIN : 800005316023             • CIN : NULL                     • CIN : NULL
   • TEL : 009539711                • TEL : 009539711                • TEL : NULL
   • MAIL : NULL                    • MAIL : client@mail.mg          • MAIL : client@mail.mg
@@ -406,43 +440,37 @@ return dist <= seuil_max
                                                           │
   ════════════════════════════════════════════════════════╪══════════════════════════════════════════════
                                                           ▼
-               Transitivité : Dossier Auto <---> Dossier Life <---> Dossier Autre
+               Transitivité : Fiche Auto <---> Fiche Life <---> Fiche Autre
                                                           │
                                                           ▼
                                Un seul et même individu physique identifié :
                                      Attribution d'un UID unique commun !
 ```
 
-#### Propriétés remarquables
-- En interrogeant uniquement Auto et Autre, aucun attribut de contact ou d'identité n'est commun : une jointure bipartite échoue.
-- La présence du dossier Life sert de **pont** : la relation d'équivalence logique $A \sim B$ et $B \sim C \implies A \sim C$ résout l'énigme.
-- C'est exactement cette logique transitive qui justifiera l'utilisation de la structure de données **Union-Find** en Partie 4.
-- **Notes orateur** : Ce transparent montre pourquoi une simple succession de requêtes `UPDATE` ne peut pas résoudre les fusions en chaîne et pourquoi une structure de graphe (composantes connexes) s'impose.
+#### La puissance de la transitivité
+- En interrogeant uniquement Auto et Autre, aucun attribut n'est commun : une jointure bipartite classique échoue.
+- La présence de la fiche Life sert de **pont** : si $A$ est relié à $B$ et que $B$ est relié à $C$, alors $A$ et $C$ appartiennent au même individu.
+- C'est cette logique transitive qui justifiera l'utilisation de la structure de données **Union-Find** en Partie 4.
+- **Notes orateur** : Faire prendre conscience aux étudiants qu'un enchaînement de requêtes SQL `UPDATE` ne peut pas gérer ces ponts sans risquer des boucles ou des incohérences.
 
 ---
 
-### Slide 12 — Bilan & Teaser Partie 3 : Modélisation cible & Pipeline ETL
+### Slide 15 — Bilan de la séance & Cap sur la Partie 3 (Pipeline ETL)
 
-- **Bandeau haut** : `BILAN DE SÉANCE · PERSPECTIVES ÉTAPE 3`
-- **Titre** : Bilan de la Partie 2 & Cap sur l'ETL
-- **Sous-titre** : Nos règles sont prêtes, passons à l'ingestion industrielle
-- **Objectif pédagogique** : Récapituler les acquis de la séance et poser les enjeux de la Partie 3 (modélisation de la base cible PostgreSQL et chargement en streaming).
+- **Arrière-plan** : Bleu ITU sombre (`#283A97`).
+- **Badge supérieur** : `BILAN DE SÉANCE · PERSPECTIVES ÉTAPE 3` (Vert citron `#B2D235`, 10pt gras).
+- **Titre** : `Bilan de la Partie 2 & Cap sur l'ETL` (Blanc `#FFFFFF`, 22pt gras).
+- **Sous-titre** : `Nos règles sont formalisées, place à l'ingestion industrielle en streaming` (Bleu très clair `#CADCFC`, 11pt).
 
-#### Matrice des acquis de la Partie 2
-```text
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │                           ACQUIS DE LA SÉANCE 2                        │
-  │  ✔ Profilage complet des 3 sources dans le notebook 01                 │
-  │  ✔ Module normalisation.py opérationnel (fonctions pures testées)      │
-  │  ✔ Matrice de rapprochement hiérarchique C1 à C4 formalisée            │
-  │  ✔ Verrou absolu anti-conflit de CIN intégré à la logique décisionnelle│
-  │  ✔ Règles de rapprochement flou adaptatif (Damerau-Levenshtein)        │
-  └────────────────────────────────────────────────────────────────────────┘
-```
-
-#### Ce qui nous attend en Partie 3 (Aperçu)
-- **Modélisation de la base cible** : création de la table consolidée `tp_assurance_etl.clients_consolides` dans PostgreSQL.
-- **Règle d'or appliquée au schéma** : stockage simultané des valeurs brutes d'origine et des colonnes canoniques nettoyées, sans altération.
-- **Détails métier préservés** : encapsulation des spécificités (immatriculation, formules, cultures, navires) dans une colonne `details_metier JSONB`.
-- **Pipeline d'ingestion streaming** : extraction par curseur côté serveur, normalisation en vol et insertion ultra-rapide par protocole binaire `COPY`.
-- **Notes orateur** : Féliciter les étudiants pour le travail d'analyse conceptuelle accompli. Annoncer que lors de la prochaine séance, nous passerons à l'ingestion des flux avec l'exécution du pipeline ETL sous Python.
+#### 2 cartes récapitulatives contrastées
+- **Carte gauche : Checklist des acquis de la Partie 2 (`#1E293B`, bordure `#334155`)** :
+  - `[X]` Profilage des 3 sources dans `notebooks/01_exploration.ipynb`.
+  - `[X]` Module `normalisation.py` opérationnel (fonctions pures testées avec pytest).
+  - `[X]` Tokenisation et tri alphabétique des prénoms validés.
+  - `[X]` Matrice de décision hiérarchique `C1` à `C4` formalisée.
+  - `[X]` Verrou de sécurité anti-conflit de CIN intégré à l'arbre logique.
+- **Carte droite : Ce qui nous attend en Partie 3 (`#1E293B`, bordure `#334155`)** :
+  - **Schéma cible unifié** : table PostgreSQL `tp_assurance_etl.clients_consolides`.
+  - **Règle d'or respectée** : stockage brut d'origine + colonnes canoniques + détails métier en `JSONB`.
+  - **Ingestion streaming** : extraction par curseur serveur, normalisation au fil de l'eau et insertion ultra-rapide par protocole binaire `COPY`.
+- **Notes orateur** : Féliciter les étudiants pour la rigueur d'analyse acquise. Annoncer que lors de la prochaine séance, nous passerons à l'exécution du pipeline d'ingestion sous Python.
