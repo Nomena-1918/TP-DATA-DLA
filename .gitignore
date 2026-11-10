@@ -1,0 +1,15 @@
+/data/*.csv
+/.venv/
+/venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.idea/
+*.iml
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+out/
+.DS_Store
