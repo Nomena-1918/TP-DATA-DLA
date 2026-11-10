@@ -92,8 +92,8 @@ def main():
     # etl
     p_etl = subparsers.add_parser("etl", help="Extrait, normalise et charge les données")
     p_etl.add_argument(
-        "--dataset", choices=["complet", "leger"], default="complet",
-        help="Version du dataset : 'complet' (4M fiches) ou 'leger' (400k fiches pour TP étudiants)",
+        "--dataset", choices=["leger", "complet"], default="leger",
+        help="Version du dataset : 'leger' (400k fiches pour TP étudiants) ou 'complet' (4M fiches)",
     )
     p_etl.add_argument("--limit", type=int, default=None, help="Nombre max de fiches par source")
     p_etl.add_argument("--reset", action="store_true", help="Ancienne option désactivée. Utiliser une cible de test vide.")
@@ -129,8 +129,8 @@ def main():
     # run-all
     p_all = subparsers.add_parser("run-all", help="Enchaîne toutes les phases du pipeline")
     p_all.add_argument(
-        "--dataset", choices=["complet", "leger"], default="complet",
-        help="Version du dataset : 'complet' (4M fiches) ou 'leger' (400k fiches pour TP étudiants)",
+        "--dataset", choices=["leger", "complet"], default="leger",
+        help="Version du dataset : 'leger' (400k fiches pour TP étudiants) ou 'complet' (4M fiches)",
     )
     p_all.add_argument("--limit", type=int, default=None, help="Nombre max de fiches par source")
     p_all.set_defaults(func=commande_run_all)

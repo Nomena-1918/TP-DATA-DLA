@@ -115,7 +115,27 @@ def creer_mapping_indices(conn) -> Tuple[int, any, any]:
     if count == 0:
         raise RuntimeError("La table etl.fiches_clients est vide. Lancez l'ETL au préalable.")
 
-    # Détection de la numérotation standard TP (1M Auto, 1M Life, 2M Autre)
+    # Détection de la numérotation standard TP léger (100k Auto, 100k Life, 200k Autre)
+    if count == 400_000 and min_id == 1_000_001 and max_id == 5_200_000:
+        def id_to_idx(id_fiche: int) -> int:
+            if id_fiche <= 1_100_000:
+                return id_fiche - 1_000_001
+            elif id_fiche <= 3_100_000:
+                return 100_000 + (id_fiche - 3_000_001)
+            else:
+                return 200_000 + (id_fiche - 5_000_001)
+
+        def idx_to_id(idx: int) -> int:
+            if idx < 100_000:
+                return 1_000_001 + idx
+            elif idx < 200_000:
+                return 3_000_001 + (idx - 100_000)
+            else:
+                return 5_000_001 + (idx - 200_000)
+
+        return count, id_to_idx, idx_to_id
+
+    # Détection de la numérotation standard TP complet (1M Auto, 1M Life, 2M Autre)
     if count == 4_000_000 and min_id == 1_000_001 and max_id == 7_000_000:
         def id_to_idx(id_fiche: int) -> int:
             if id_fiche <= 2_000_000:
