@@ -47,23 +47,23 @@ NAVIRES = (
     ("Caboteur", ("Corps de navire", "Responsabilité civile", "Cargaison")),
 )
 PORTS = ("Toamasina", "Mahajanga", "Toliara", "Antsiranana")
-# Configuration des deux modes de génération (Complet 2M / Léger 200k)
+# Configuration des deux modes de génération (Léger 200k / Complet 2M)
 CONFIGS = {
-    "complet": {
-        "volume": 2_000_000,
-        "fiches_initiales": 1_980_000,
-        "commun": 700_000,
-        "reprises_communes": 14_000,
-        "debut_exclusif": 1_280_001,
-        "fichier_defaut": "clients_autre.csv",
-    },
     "leger": {
         "volume": 200_000,
         "fiches_initiales": 198_000,
         "commun": 70_000,
         "reprises_communes": 1_400,
         "debut_exclusif": 128_001,
-        "fichier_defaut": "clients_autre_leger.csv",
+        "fichier_defaut": "clients_autre.csv",
+    },
+    "complet": {
+        "volume": 2_000_000,
+        "fiches_initiales": 1_980_000,
+        "commun": 700_000,
+        "reprises_communes": 14_000,
+        "debut_exclusif": 1_280_001,
+        "fichier_defaut": "clients_autre_complet.csv",
     },
 }
 
@@ -231,8 +231,8 @@ if __name__ == "__main__":
     dossier_data = Path(__file__).resolve().parents[1] / "data"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--mode", choices=["complet", "leger"], default="complet",
-        help="mode du dataset : 'complet' (2 000 000 fiches) ou 'leger' (200 000 fiches)",
+        "--mode", choices=["leger", "complet"], default="leger",
+        help="mode du dataset : 'leger' (200 000 fiches, recommandé pour TP) ou 'complet' (2 000 000 fiches)",
     )
     parser.add_argument(
         "--sortie", type=Path, default=None,
