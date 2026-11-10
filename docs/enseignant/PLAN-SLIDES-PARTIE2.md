@@ -100,33 +100,39 @@ Ce document définit le plan détaillé de la **Présentation 2** sur les 5 pré
 - **Arrière-plan** : Blanc cassé moderne (`#F8FAFC`).
 - **Badge supérieur** : `DIAGNOSTIC TECHNIQUE · ÉCHEC DU JOIN CLASSIQUE` (Vert `#2EA853`, 10pt gras).
 - **Titre** : `Pourquoi un simple JOIN SQL direct est impossible` (Bleu nuit `#1E293B`, 19pt gras).
-- **Sous-titre** : `Démonstration de deux requêtes directes et de leurs blocages` (Gris ardoise `#64748B`, 10.5pt).
+- **Sous-titre** : `Cloisonnement physique multi-SGBD et rupture sémantique des données` (Gris ardoise `#64748B`, 10.5pt).
 
 #### 2 colonnes aérées
-- **Colonne gauche : Boîte Terminal sombre `#1E293B` (Requêtes SQL réelles commentées)** :
+- **Colonne gauche : Boîte Terminal sombre `#1E293B` (Multi-SGBD & SQL naïf)** :
 ```sql
--- Blocage 1 : Incompatibilité physique de types
+-- 1. Obstacle physique : 3 moteurs totalement disjoints !
+-- Auto  -> PostgreSQL 16 (port 5432)
+-- Life  -> MySQL 8.4 (port 3306)
+-- Autre -> Disque local (fichier CSV)
+-- Impossible d'exécuter un JOIN direct entre serveurs distincts !
+
+-- 2. Même si les tables étaient réunies dans la même base :
 SELECT a.nom_assure, l.nom_adherent 
-FROM tp_assurance.clients_auto a
-JOIN tp_assurance_life.clients_life l 
+FROM clients_auto a
+JOIN clients_life l 
   ON a.numero_cin = l.cin_numerique;
 -- ERREUR : operator does not exist: text = bigint
 
--- Blocage 2 : Égalité stricte rendue caduque par la saisie
+-- 3. Sensibilité à la casse, espaces et formats de date :
 SELECT a.id_client_auto, l.ref_adherent
-FROM tp_assurance.clients_auto a
-JOIN tp_assurance_life.clients_life l
+FROM clients_auto a
+JOIN clients_life l
   ON a.nom_assure = l.nom_adherent
  AND a.ne_le::text = l.date_naiss::text;
 -- RÉSULTAT : 0 correspondance trouvée !
 ```
 
 - **Colonne droite : Carte explicative (`#FFFFFF`)** :
-  - **Types SQL disparates** : Le SGBD bloque la comparaison directe d'une chaîne formatée avec un entier natif.
-  - **Sensibilité à la casse & espaces** : `' Ramanitra ' = 'RAMANITRA'` est évalué à `FALSE`.
-  - **Incohérence temporelle** : `'1970-04-19'` $\ne$ `'19700419'`.
-  - **Conclusion** : Un nettoyage canonique intermédiaire est techniquement obligatoire.
-- **Notes orateur** : Cette diapositive justifie concrètement pourquoi l'on doit passer par Python pour normaliser avant de rapprocher.
+  - **1. Éparpillement multi-bases** : Données réparties sur 3 technologies différentes. Aucun SGBD ne peut nativement joindre ces sources sans un outillage lourd (connecteurs distants, FDW) ou un pipeline d'ingestion centralisé.
+  - **2. Le piège de la migration de schéma** : Consolider ces données dans une base cible exige une migration de schéma préalable, elle-même source majeure de pannes (conflits d'encodage `utf8mb4`/`latin1`, perte de précision, conversions de types).
+  - **3. Incompatibilité syntaxique des attributs** : Types physiques opposés (`TEXT` vs `BIGINT`), espaces parasites, casse désordonnée et dates incompatibles (`YYYY-MM-DD` vs entier `19700419`).
+  - **Conclusion** : Ni la base de données seule, ni une simple requête SQL ne peuvent résoudre ce problème : un pipeline Python orchestré avec normalisation dédiée est incontournable.
+- **Notes orateur** : Bien insister sur le double verrou : le verrou d'architecture (données réparties sur des SGBD hétérogènes imposant une étape délicate d'ingestion) et le verrou sémantique (données sales qui ne se joignent pas).
 
 ---
 
